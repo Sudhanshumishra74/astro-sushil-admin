@@ -1,0 +1,172 @@
+/* Admin Phone Input — themed to match primary: #424874, secondary: #f4eeff */
+
+.admin-phone-input .react-tel-input {
+  width: 100%;
+  font-family: inherit;
+}
+
+/* ── Input field ── */
+.admin-phone-input .react-tel-input .form-control {
+  width: 100% !important;
+  height: 40px !important;
+  background-color: #f4eeff !important;
+  border: 1px solid #d8d0ee !important;
+  border-radius: 0.75rem !important;
+  padding-left: 58px !important;
+  padding-right: 1rem !important;
+  font-size: 0.875rem !important;
+  line-height: 1.25rem !important;
+  color: #1a1a1a !important;
+  outline: none !important;
+  transition: border-color 0.2s, box-shadow 0.2s !important;
+  font-family: inherit !important;
+}
+
+.admin-phone-input .react-tel-input .form-control::placeholder {
+  color: #b0a8c8 !important;
+}
+
+.admin-phone-input .react-tel-input .form-control:focus {
+  border-color: #424874 !important;
+  box-shadow: 0 0 0 2px rgba(66, 72, 116, 0.1) !important;
+}
+
+/* ── White bg variant (for modals with bg-white inputs) ── */
+.admin-phone-input.white .react-tel-input .form-control {
+  background-color: #ffffff !important;
+  height: 36px !important;
+}
+
+.admin-phone-input.white .react-tel-input .flag-dropdown {
+  background-color: #ffffff !important;
+}
+
+.admin-phone-input.white .react-tel-input .selected-flag:hover,
+.admin-phone-input.white .react-tel-input .selected-flag:focus,
+.admin-phone-input.white .react-tel-input .flag-dropdown:hover {
+  background-color: #f9f8ff !important;
+}
+
+/* ── Flag dropdown button ── */
+.admin-phone-input .react-tel-input .flag-dropdown {
+  background-color: #f4eeff !important;
+  border: 1px solid #d8d0ee !important;
+  border-right: 1px solid #d8d0ee !important;
+  border-radius: 0.75rem 0 0 0.75rem !important;
+  transition: background-color 0.15s, border-color 0.2s !important;
+}
+
+.admin-phone-input .react-tel-input .flag-dropdown.open {
+  background-color: #ede8f8 !important;
+  border-color: #424874 !important;
+  border-radius: 0.75rem 0 0 0.75rem !important;
+}
+
+/* sync flag border when input is focused — achieved via sibling selector on the wrapper */
+.admin-phone-input .react-tel-input .form-control:focus + .flag-dropdown,
+.admin-phone-input .react-tel-input .flag-dropdown:hover {
+  border-color: #424874 !important;
+}
+
+/* ── Selected flag ── */
+.admin-phone-input .react-tel-input .selected-flag {
+  background-color: transparent !important;
+  border-radius: 0.75rem 0 0 0.75rem !important;
+  padding: 0 8px 0 12px !important;
+  width: 52px !important;
+}
+
+.admin-phone-input .react-tel-input .selected-flag:hover,
+.admin-phone-input .react-tel-input .selected-flag:focus {
+  background-color: rgba(66, 72, 116, 0.06) !important;
+}
+
+/* ── Arrow ── */
+.admin-phone-input .react-tel-input .selected-flag .arrow {
+  border-top-color: #9a9abf !important;
+  left: 24px !important;
+}
+
+.admin-phone-input .react-tel-input .selected-flag .arrow.up {
+  border-bottom-color: #424874 !important;
+  border-top-color: transparent !important;
+}
+
+/* ── Country list dropdown ── */
+.admin-phone-input .react-tel-input .country-list {
+  background-color: #ffffff !important;
+  border: 1px solid #e0d9f5 !important;
+  border-radius: 0.75rem !important;
+  box-shadow: 0 8px 24px rgba(66, 72, 116, 0.12) !important;
+  margin-top: 3px !important;
+  max-height: 200px !important;
+  overflow-y: auto !important;
+  z-index: 100 !important;
+  scrollbar-width: thin !important;
+  scrollbar-color: #d8d0ee transparent !important;
+}
+
+.admin-phone-input .react-tel-input .country-list::-webkit-scrollbar {
+  width: 4px;
+}
+.admin-phone-input .react-tel-input .country-list::-webkit-scrollbar-thumb {
+  background-color: #d8d0ee;
+  border-radius: 4px;
+}
+
+.admin-phone-input .react-tel-input .country-list .country {
+  padding: 7px 12px !important;
+  font-size: 0.8125rem !important;
+  color: #1a1a1a !important;
+  transition: background-color 0.12s !important;
+}
+
+.admin-phone-input .react-tel-input .country-list .country:hover {
+  background-color: #faf8ff !important;
+}
+
+.admin-phone-input .react-tel-input .country-list .country.highlight {
+  background-color: #f4eeff !important;
+  color: #424874 !important;
+  font-weight: 500 !important;
+}
+
+.admin-phone-input .react-tel-input .country-list .country-name {
+  color: inherit !important;
+}
+
+.admin-phone-input .react-tel-input .country-list .dial-code {
+  color: #9a9abf !important;
+}
+
+/* ── Search box inside dropdown ── */
+.admin-phone-input .react-tel-input .country-list .search {
+  padding: 8px 10px 6px !important;
+  position: sticky !important;
+  top: 0 !important;
+  background-color: #ffffff !important;
+  border-bottom: 1px solid #ede8f8 !important;
+}
+
+.admin-phone-input .react-tel-input .country-list .search-box {
+  width: 100% !important;
+  padding: 6px 10px !important;
+  border: 1px solid #d8d0ee !important;
+  border-radius: 8px !important;
+  font-size: 0.8rem !important;
+  background-color: #f4eeff !important;
+  color: #1a1a1a !important;
+  outline: none !important;
+  transition: border-color 0.15s !important;
+  font-family: inherit !important;
+}
+
+.admin-phone-input .react-tel-input .country-list .search-box:focus {
+  border-color: #424874 !important;
+}
+
+/* ── Divider between preferred and other countries ── */
+.admin-phone-input .react-tel-input .country-list .divider {
+  border-top: 1px solid #ede8f8 !important;
+  margin: 2px 0 !important;
+}

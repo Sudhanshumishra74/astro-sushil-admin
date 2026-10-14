@@ -1,0 +1,64 @@
+@import "tailwindcss";
+
+
+@theme {
+  --font-sans: "Outfit", sans-serif;
+  --font-heading: "Philosopher", serif;
+
+  --color-primary: #424874;
+  --color-secondary: #f4eeff;
+  --color-gold: #D4AF37;
+  --color-black: #1a1a1a;
+  --color-white: #ffffff;
+}
+
+@layer base {
+  body {
+    @apply font-sans bg-secondary text-black;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: var(--font-heading);
+  }
+}
+
+@layer utilities {
+  .font-heading {
+    font-family: var(--font-heading);
+  }
+}
+
+
+::-webkit-scrollbar {
+  display: none;
+}
+
+* {
+  scrollbar-width: none;
+}
+
+* {
+  -ms-overflow-style: none;
+}
+
+
+
+.ProseMirror table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.ProseMirror td,
+.ProseMirror th {
+  border: 1px solid #ddd;
+  padding: 6px;
+}
+
+.ProseMirror th {
+  background: #f5f5f5;
+}

@@ -1,0 +1,79 @@
+name: Astro Sushil Admin CI/CD
+
+on:
+  push:
+    branches: [prod]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install rsync and ssh client on runner
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y rsync openssh-client
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VPS_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H "${{ secrets.VPS_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Prepare VPS
+        run: |
+          ssh -i ~/.ssh/id_rsa "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" << 'EOF'
+            set -e
+
+            mkdir -p ~/astro-sushil/admin
+
+            if ! command -v rsync >/dev/null 2>&1; then
+              echo "rsync not found on VPS, installing..."
+              sudo apt-get update
+              sudo apt-get install -y rsync
+            else
+              echo "rsync already installed on VPS"
+            fi
+          EOF
+
+      - name: Sync admin panel files to VPS
+        run: |
+          rsync -az --delete \
+            --exclude ".git" \
+            --exclude ".github" \
+            --exclude "node_modules" \
+            -e "ssh -i ~/.ssh/id_rsa" \
+            ./ "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:~/astro-sushil/admin"
+
+      - name: Deploy admin on VPS
+        run: |
+          ssh -i ~/.ssh/id_rsa "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" << 'EOF'
+            set -e
+
+            cd ~/astro-sushil/admin
+
+            echo "Building new admin Docker image"
+            docker build -t admin-temp .
+
+            echo "Stopping and removing existing admin container"
+            docker stop admin || true
+            docker rm -f admin || true
+
+            echo "Replacing latest admin image"
+            docker image rm admin:latest || true
+            docker tag admin-temp admin:latest
+
+            echo "Starting new admin container"
+            docker run -d --restart always --name admin -p 127.0.0.1:2000:80 admin:latest
+
+            echo "Cleaning up intermediate and old images"
+            docker rmi admin-temp || true
+            docker image prune -f
+            docker system prune -f
+            docker volume prune -f
+            docker builder prune -f
+          EOF
