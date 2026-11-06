@@ -51,7 +51,7 @@ export function PaymentSection() {
   return (
     <div className="flex flex-col gap-5">
       <SectionCard title="General Payment" description="Currency, tax and COD settings" icon={CreditCard} index={0}>
-        <Grid>
+        {/* <Grid> */}
           {/* <Field label="Currency">
             <Select value={data.currency} onChange={(e) => set("currency", e.target.value)}>
               <option value="INR">INR — Indian Rupee</option>
@@ -59,15 +59,15 @@ export function PaymentSection() {
               <option value="EUR">EUR — Euro</option>
             </Select>
           </Field> */}
-          <Field label="Tax Percent">
+          {/* <Field label="Tax Percent">
             <NumberInput icon={Percent} placeholder="18" value={data.taxPercent} onChange={(e) => set("taxPercent", e.target.value)} />
-          </Field>
-        </Grid>
+          </Field> */}
+        {/* </Grid> */}
         <Toggle label="Cash on Delivery (COD)" description="Allow customers to pay on delivery" value={data.codEnabled} onChange={(v) => set("codEnabled", v)} />
         <SaveBar onSave={handleSave} loading={loading} saved={saved} />
       </SectionCard>
 
-      <SectionCard title="Razorpay" description="Indian payment gateway credentials" icon={CreditCard} index={1}>
+      {/* <SectionCard title="Razorpay" description="Indian payment gateway credentials" icon={CreditCard} index={1}>
         <Grid>
           <Field label="Razorpay Key ID">
             <Input icon={Key} placeholder="rzp_live_..." value={data.razorpayKey} onChange={(e) => set("razorpayKey", e.target.value)} secret />
@@ -76,9 +76,9 @@ export function PaymentSection() {
             <Input icon={Key} placeholder="Secret key" value={data.razorpaySecret} onChange={(e) => set("razorpaySecret", e.target.value)} secret />
           </Field>
         </Grid>
-      </SectionCard>
+      </SectionCard> */}
 
-      <SectionCard title="Stripe" description="International payment gateway" icon={CreditCard} index={2}>
+      {/* <SectionCard title="Stripe" description="International payment gateway" icon={CreditCard} index={2}>
         <Grid>
           <Field label="Stripe Publishable Key">
             <Input icon={Key} placeholder="pk_live_..." value={data.stripeKey} onChange={(e) => set("stripeKey", e.target.value)} secret />
@@ -87,7 +87,7 @@ export function PaymentSection() {
             <Input icon={Key} placeholder="sk_live_..." value={data.stripeSecret} onChange={(e) => set("stripeSecret", e.target.value)} secret />
           </Field>
         </Grid>
-      </SectionCard>
+      </SectionCard> */}
     </div>
   );
 }
@@ -97,7 +97,18 @@ import { Truck } from "lucide-react";
 
 export function ShippingSection() {
   const { settings, updateSection, loading } = useSettingStore();
-  const [data, setData] = useState(() => settings?.shipping || { freeShippingThreshold: 1000, baseDeliveryCharge: 50, deliveryChargePerKM: 5, maxCODLimit: 20000, supportedAreas: [] });
+  const [data, setData] = useState(
+    () =>
+      settings?.shipping || {
+        freeShippingThreshold: 1000,
+        baseDeliveryCharge: 50,
+        deliveryChargePerKM: 5,
+        maxCODLimit: 20000,
+        supportedAreas: [],
+        chargeSelfFulfilled: true,
+        displayMode: "merged",
+      },
+  );
   const [saved, setSaved] = useState(false);
   const set = (k, v) => setData((p) => ({ ...p, [k]: v }));
 
@@ -108,21 +119,21 @@ export function ShippingSection() {
 
   return (
     <SectionCard title="Shipping & Delivery" description="Rates, thresholds, and service areas" icon={Truck}>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Field label="Free Shipping Above" hint="Amount in ₹">
           <NumberInput prefix="₹" placeholder="1000" value={data.freeShippingThreshold} onChange={(e) => set("freeShippingThreshold", e.target.value)} />
         </Field>
         <Field label="Base Delivery Charge">
           <NumberInput prefix="₹" placeholder="50" value={data.baseDeliveryCharge} onChange={(e) => set("baseDeliveryCharge", e.target.value)} />
         </Field>
-        {/* <Field label="Charge per KM">
+        <Field label="Charge per KM">
           <NumberInput prefix="₹" placeholder="5" value={data.deliveryChargePerKM} onChange={(e) => set("deliveryChargePerKM", e.target.value)} />
-        </Field> */}
-        {/* <Field label="Max COD Limit">
+        </Field>
+        <Field label="Max COD Limit">
           <NumberInput prefix="₹" placeholder="20000" value={data.maxCODLimit} onChange={(e) => set("maxCODLimit", e.target.value)} />
-        </Field> */}
-      </div>
-      <Field label="Supported Areas" hint="Comma-separated list of pincodes or city names">
+        </Field>
+      </div> */}
+      {/* <Field label="Supported Areas" hint="Comma-separated list of pincodes or city names">
         <textarea
           rows={3}
           placeholder="110001, 110002, Mumbai, Delhi..."
@@ -130,7 +141,13 @@ export function ShippingSection() {
           onChange={(e) => set("supportedAreas", e.target.value.split(",").map((s) => s.trim()).filter(Boolean))}
           className="w-full bg-secondary border border-[#d8d0ee] rounded-xl px-4 py-3 text-sm text-black placeholder-[#b0a8c8] focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all resize-none"
         />
-      </Field>
+      </Field> */}
+      <Toggle
+        label="Charge shipping for self-fulfilled orders"
+        description="Off = always ₹0 for own-inventory orders (the live Shiprocket-quoted rate is skipped entirely). Doesn't affect whether the order still ships via Shiprocket after payment."
+        value={data.chargeSelfFulfilled}
+        onChange={(v) => set("chargeSelfFulfilled", v)}
+      />
       <SaveBar onSave={handleSave} loading={loading} saved={saved} />
     </SectionCard>
   );
@@ -141,7 +158,7 @@ import { Package, AlertTriangle, ShoppingCart } from "lucide-react";
 
 export function ProductSection() {
   const { settings, updateSection, loading } = useSettingStore();
-  const [data, setData] = useState(() => settings?.product || { lowStockWarning: 5, maxQuantityInCart: 10, allowOutOfStockPurchase: false });
+  const [data, setData] = useState(() => settings?.product || { lowStockWarning: 5, maxQuantityInCart: 10, allowOutOfStockPurchase: false, certificatesEnabled: false });
   const [saved, setSaved] = useState(false);
   const set = (k, v) => setData((p) => ({ ...p, [k]: v }));
 
@@ -160,7 +177,14 @@ export function ProductSection() {
           <NumberInput icon={ShoppingCart} placeholder="10" value={data.maxQuantityInCart} onChange={(e) => set("maxQuantityInCart", e.target.value)} />
         </Field>
       </Grid>
-     
+
+      <Toggle
+        label="Enable Certificates"
+        description="Turns product certificates (and their pricing) on or off site-wide — in the product form, storefront, cart, checkout, and orders."
+        value={data.certificatesEnabled}
+        onChange={(v) => set("certificatesEnabled", v)}
+      />
+
       <SaveBar onSave={handleSave} loading={loading} saved={saved} />
     </SectionCard>
   );
@@ -193,33 +217,44 @@ export function OffersSection() {
 }
 
 // ─── Order Section ────────────────────────────────────────────────────────────
-// import { Clock, RefreshCw } from "lucide-react";
+import { Clock, RefreshCw, Ban } from "lucide-react";
 
-// export function OrderSection() {
-//   const { settings, updateSection, loading } = useSettingStore();
-//   const [data, setData] = useState(() => settings?.order || { autoCancelUnpaidMinutes: 60, returnPolicyDays: 7, maxOrderValue: 100000 });
-//   const [saved, setSaved] = useState(false);
-//   const set = (k, v) => setData((p) => ({ ...p, [k]: v }));
+export function OrderSection() {
+  const { settings, updateSection, loading } = useSettingStore();
+  const [data, setData] = useState(
+    () =>
+      settings?.order || {
+        autoCancelUnpaidMinutes: 60,
+        cancellationWindowHours: 24,
+        returnPolicyDays: 7,
+        maxOrderValue: 100000,
+      },
+  );
+  const [saved, setSaved] = useState(false);
+  const set = (k, v) => setData((p) => ({ ...p, [k]: v }));
 
-//   const handleSave = async () => {
-//     const ok = await updateSection("order", data);
-//     if (ok) { setSaved(true); setTimeout(() => setSaved(false), 2500); }
-//   };
+  const handleSave = async () => {
+    const ok = await updateSection("order", data);
+    if (ok) { setSaved(true); setTimeout(() => setSaved(false), 2500); }
+  };
 
-//   return (
-//     <SectionCard title="Order Management" description="Auto-cancel, returns and limits" icon={ShoppingCart}>
-//       <Grid cols={3}>
-//         <Field label="Auto-cancel Unpaid Orders" hint="Minutes before auto-cancellation">
-//           <NumberInput icon={Clock} placeholder="60" value={data.autoCancelUnpaidMinutes} onChange={(e) => set("autoCancelUnpaidMinutes", e.target.value)} />
-//         </Field>
-//         <Field label="Return Policy Days">
-//           <NumberInput icon={RefreshCw} placeholder="7" value={data.returnPolicyDays} onChange={(e) => set("returnPolicyDays", e.target.value)} />
-//         </Field>
-//         <Field label="Max Order Value">
-//           <NumberInput prefix="₹" placeholder="100000" value={data.maxOrderValue} onChange={(e) => set("maxOrderValue", e.target.value)} />
-//         </Field>
-//       </Grid>
-//       <SaveBar onSave={handleSave} loading={loading} saved={saved} />
-//     </SectionCard>
-//   );
-// }
+  return (
+    <SectionCard title="Order Management" description="Auto-cancel, cancellation, returns and limits" icon={ShoppingCart}>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Field label="Auto-cancel Unpaid Orders" hint="Minutes before auto-cancellation">
+          <NumberInput icon={Clock} placeholder="60" value={data.autoCancelUnpaidMinutes} onChange={(e) => set("autoCancelUnpaidMinutes", e.target.value)} />
+        </Field>
+        <Field label="Cancellation Window" hint="Hours after placement a customer can self-cancel — 0 for no limit">
+          <NumberInput icon={Ban} placeholder="24" value={data.cancellationWindowHours} onChange={(e) => set("cancellationWindowHours", e.target.value)} />
+        </Field>
+        <Field label="Return Policy Days" hint="Days after delivery a customer can request a return">
+          <NumberInput icon={RefreshCw} placeholder="7" value={data.returnPolicyDays} onChange={(e) => set("returnPolicyDays", e.target.value)} />
+        </Field>
+        <Field label="Max Order Value">
+          <NumberInput prefix="₹" placeholder="100000" value={data.maxOrderValue} onChange={(e) => set("maxOrderValue", e.target.value)} />
+        </Field>
+      </div>
+      <SaveBar onSave={handleSave} loading={loading} saved={saved} />
+    </SectionCard>
+  );
+}

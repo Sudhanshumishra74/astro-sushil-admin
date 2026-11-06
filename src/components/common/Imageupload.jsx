@@ -1,5 +1,6 @@
 import { Upload, FileText, AlertCircle } from "lucide-react";
 import { useState, useRef, useCallback } from "react";
+import ImageCropModal from "./ImageCropModal";
 
 const ImageUpload = ({
   value = null,
@@ -10,6 +11,11 @@ const ImageUpload = ({
   error,
   hint,
   className = "",
+  // Same crop step already used by the Media library (ImageCropModal) —
+  // opt-in since a few callers (e.g. an SVG logo upload) shouldn't force a
+  // fixed-aspect crop onto every image.
+  enableCrop = false,
+  cropAspect = 16 / 9,
 }) => {
   const inputRef = useRef(null);
   const [dragging, setDragging] = useState(false);
@@ -18,12 +24,39 @@ const ImageUpload = ({
   );
   const [fileError, setFileError] = useState("");
   const [fileMeta, setFileMeta] = useState(null);
+  const [cropSrc, setCropSrc] = useState(null);
+  const [pendingFile, setPendingFile] = useState(null);
 
   const formatBytes = (bytes) => {
     if (bytes < 1024) return `${bytes} B`;
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
+
+  // Resolution is read from the browser's own decode of the file — shown
+  // alongside name/size so the admin can tell what they're about to upload
+  // without leaving this form to check the original file's properties.
+  const readImageDimensions = (url) =>
+    new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
+      img.onerror = () => resolve(null);
+      img.src = url;
+    });
+
+  const finalizeFile = useCallback(
+    async (file, url) => {
+      const dimensions = await readImageDimensions(url);
+      setPreview(url);
+      setFileMeta({
+        name: file.name,
+        size: formatBytes(file.size),
+        dimensions,
+      });
+      onChange?.(file);
+    },
+    [onChange],
+  );
 
   const processFile = useCallback(
     (file) => {
@@ -42,12 +75,31 @@ const ImageUpload = ({
       }
 
       const url = URL.createObjectURL(file);
-      setPreview(url);
-      setFileMeta({ name: file.name, size: formatBytes(file.size) });
-      onChange?.(file);
+
+      // SVGs have no fixed raster aspect ratio to crop against, so the crop
+      // step is skipped for them even when enableCrop is on.
+      if (enableCrop && file.type !== "image/svg+xml") {
+        setPendingFile(file);
+        setCropSrc(url);
+        return;
+      }
+
+      finalizeFile(file, url);
     },
-    [accept, maxSizeMB, onChange]
+    [accept, maxSizeMB, enableCrop, finalizeFile],
   );
+
+  const handleCropComplete = async (croppedFile) => {
+    const url = URL.createObjectURL(croppedFile);
+    setCropSrc(null);
+    setPendingFile(null);
+    await finalizeFile(croppedFile, url);
+  };
+
+  const handleCropCancel = () => {
+    setCropSrc(null);
+    setPendingFile(null);
+  };
 
   const handleDrop = useCallback(
     (e) => {
@@ -188,6 +240,11 @@ const ImageUpload = ({
           <span className="font-medium text-black truncate max-w-50">
             {fileMeta.name}
           </span>
+          {fileMeta.dimensions && (
+            <span className="shrink-0">
+              {fileMeta.dimensions.width}×{fileMeta.dimensions.height}px
+            </span>
+          )}
           <span className="ml-auto shrink-0">{fileMeta.size}</span>
         </div>
       )}
@@ -205,6 +262,18 @@ const ImageUpload = ({
           <AlertCircle size={12} />
           {combinedError}
         </p>
+      )}
+
+      {enableCrop && (
+        <ImageCropModal
+          open={!!cropSrc}
+          imageSrc={cropSrc}
+          aspect={cropAspect}
+          fileName={pendingFile?.name || "cropped.jpg"}
+          mimeType={pendingFile?.type || "image/jpeg"}
+          onCancel={handleCropCancel}
+          onCropComplete={handleCropComplete}
+        />
       )}
     </div>
   );

@@ -22,6 +22,33 @@ const ORDER_STATUS_OPTIONS = [
   { value: "cancelled", label: "Cancelled" },
 ];
 
+const ORDER_TYPE_OPTIONS = [
+  { value: "", label: "All Types" },
+  { value: "physical", label: "Physical" },
+  { value: "digital", label: "Digital" },
+];
+
+// A single label per order rather than stacking a base Physical/Digital
+// badge with anything else — physical+digital items together on one order
+// (order.orderType alone can't tell you this — it's set to "physical"
+// whenever ANY item is physical, even one placed alongside a digital item)
+// is folded into "Mixed" so admins can spot it.
+function orderTypeLabel(row) {
+  const items = row.items || [];
+
+  if (row.orderType === "digital") return { label: "Digital", variant: "info" };
+
+  // orderType === "physical" from here — but items[].type is a newer field
+  // (order.model.js) than orderType itself, so orders placed before it
+  // existed won't have it on their items; nothing here can flag a legacy
+  // order as "Mixed" for physical+digital, only ones placed since.
+  if (items.some((i) => i.type === "digital")) {
+    return { label: "Mixed", variant: "warning" };
+  }
+
+  return { label: "Physical", variant: "default" };
+}
+
 const STATUS_VARIANT = {
   confirmed: "success",
   placed: "info",
@@ -102,12 +129,10 @@ const buildColumns = () => [
   {
     key: "orderType",
     label: "Type",
-    render: (row) => (
-      <Badge
-        label={row.orderType === "digital" ? "Digital" : "Physical"}
-        variant={row.orderType === "digital" ? "info" : "default"}
-      />
-    ),
+    render: (row) => {
+      const { label, variant } = orderTypeLabel(row);
+      return <Badge label={label} variant={variant} />;
+    },
   },
   {
     key: "amount",
@@ -122,6 +147,16 @@ const buildColumns = () => [
         </span>
       );
     },
+  },
+  {
+    key: "paymentMethod",
+    label: "Payment Type",
+    render: (row) => (
+      <Badge
+        label={row.payment?.method === "cod" ? "COD" : row.payment?.method === "razorpay" ? "Prepaid" : "—"}
+        variant={row.payment?.method === "cod" ? "warning" : "info"}
+      />
+    ),
   },
   {
     key: "payment",
@@ -167,6 +202,7 @@ export default function OrderList() {
 
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
+  const [orderType, setOrderType] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [productId, setProductId] = useState("");
@@ -180,6 +216,7 @@ export default function OrderList() {
       limit: LIMIT,
       search,
       status,
+      orderType,
       fromDate: dateFrom,
       toDate: dateTo,
       productId,
@@ -214,6 +251,11 @@ export default function OrderList() {
   const handleProductChange = (val) => {
     setProductId(val);
     fetch({ productId: val, page: 1 });
+  };
+
+  const handleOrderTypeChange = (val) => {
+    setOrderType(val);
+    fetch({ orderType: val, page: 1 });
   };
 
   const handlePageChange = (p) => {
@@ -340,6 +382,15 @@ export default function OrderList() {
             <option value="">All Products</option>
             {productOptions.map((p) => (
               <option key={p._id} value={p._id}>{p.name}</option>
+            ))}
+          </select>
+          <select
+            value={orderType}
+            onChange={(e) => handleOrderTypeChange(e.target.value)}
+            className="py-2.5 px-3 text-sm bg-secondary border border-[#d8d0ee] rounded-xl text-black outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all"
+          >
+            {ORDER_TYPE_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
             ))}
           </select>
           <DateFilter

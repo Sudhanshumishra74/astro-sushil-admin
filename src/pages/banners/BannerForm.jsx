@@ -160,8 +160,13 @@ export default function BannerForm({ initial, onSubmit, loading }) {
         ))}
       </div>
 
-      <Field label="Upload Image (Recommended: 665px x 665px)">
-        <ImageUpload  value={form.image}  onChange={(file) => setFile(file)} />
+      <Field label="Upload Image (Recommended: 520px x 650px — the homepage shows this cutout with object-contain, not a filled square)">
+        <ImageUpload
+          value={form.image}
+          onChange={(file) => setFile(file)}
+          enableCrop
+          cropAspect={4 / 5}
+        />
       </Field>
 
       <div className="flex justify-end pt-2">

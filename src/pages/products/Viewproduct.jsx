@@ -1,6 +1,6 @@
 /* eslint-disable no-unused-vars */
 /* eslint-disable react-hooks/exhaustive-deps */
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
@@ -21,7 +21,6 @@ import {
   CheckCircle2,
   XCircle,
   TrendingUp,
-  Award,
   Eye,
   ChevronLeft,
   ChevronRight,
@@ -179,7 +178,13 @@ function StarRating({ value }) {
 export default function ViewProduct() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { product, fetchProductById, deleteProduct, resetProduct, loading } = useProductStore();
+  const {
+    product,
+    fetchProductById,
+    deleteProduct,
+    resetProduct,
+    loading,
+  } = useProductStore();
 
   useEffect(() => {
     fetchProductById(id);
@@ -206,20 +211,18 @@ export default function ViewProduct() {
 
   const p = product;
 
-  /* Computed final price */
-  const finalPrice = (() => {
-    const orig = parseFloat(p.originalPrice);
-    const disc = parseFloat(p.discountValue);
-    if (!orig) return null;
-    if (!disc) return orig;
-    if (p.discountType === "percentage") return Math.round(orig - (orig * disc) / 100);
-    return Math.max(0, orig - disc);
-  })();
-
-  const saving = finalPrice !== null ? parseFloat(p.originalPrice) - finalPrice : 0;
+  // `price`/`mrp` are already the final, ready-to-display values by the
+  // time they reach here — the backend's pre-save hook bakes discountValue/
+  // discountType into `price` for internal simple products. There's
+  // nothing left to recompute here. Variant-based products carry null
+  // price/mrp at the top level (their own Variants table below has the
+  // real numbers instead).
+  const mrp = Number.isFinite(parseFloat(p.mrp)) ? parseFloat(p.mrp) : null;
+  const finalPrice = Number.isFinite(parseFloat(p.price)) ? parseFloat(p.price) : null;
+  const saving = mrp !== null && finalPrice !== null && mrp > finalPrice ? mrp - finalPrice : 0;
 
   return (
-    <div className="min-h-screen bg-[#f7f7fb] px-4 py-8 md:px-8">
+    <div className="min-h-screen bg-[#f7f7fb] px-4 py-8 md:px-8 rounded-2xl">
 
       {/* ── Header ── */}
       <div className="mb-8 flex items-center justify-between flex-wrap gap-3">
@@ -249,10 +252,29 @@ export default function ViewProduct() {
             <ImageGallery thumbnail={p.thumbnail} images={p.images} />
           </Card>
 
+          {/* Videos */}
+          {p.videos?.length > 0 && (
+            <Card title={p.videos.length > 1 ? "Videos" : "Video"}>
+              <div className="flex flex-col gap-3 sm:flex-row">
+                {p.videos.map((v) => (
+                  <video
+                    key={v}
+                    src={v}
+                    controls
+                    className="w-full max-h-96 rounded-2xl bg-black sm:flex-1"
+                  />
+                ))}
+              </div>
+            </Card>
+          )}
+
           {/* Basic Info */}
           <Card title="Basic Info">
             <div>
-              <h2 className="text-xl font-bold text-[#1a1a2e] leading-snug">{p.name}</h2>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className="text-xl font-bold text-[#1a1a2e] leading-snug">{p.name}</h2>
+                {p.soldByRatti && <Badge color="amber">Sold by Ratti</Badge>}
+              </div>
               {p.shortDescription && (
                 <p className="mt-1.5 text-sm text-[#7c7ca0] leading-relaxed">{p.shortDescription}</p>
               )}
@@ -272,7 +294,11 @@ export default function ViewProduct() {
               <InfoRow icon={Globe} label="Type" value={p.type?.charAt(0).toUpperCase() + p.type?.slice(1)} />
               <InfoRow icon={Layers} label="Category" value={p.category?.name || p.category} />
               <InfoRow icon={Hash} label="SKU" value={p.sku} />
-              <InfoRow icon={Box} label="Stock" value={p.stock !== undefined ? `${p.stock} units` : null} />
+              <InfoRow
+                icon={Box}
+                label="Stock"
+                value={p.stock === undefined ? null : `${p.stock} units`}
+              />
             </div>
 
             {/* Keywords */}
@@ -305,14 +331,39 @@ export default function ViewProduct() {
                     </tr>
                   </thead>
                   <tbody>
-                    {p.variants.map((v, i) => (
-                      <tr key={i} className="border-b border-[#f9f9fc] last:border-0">
-                        <td className="py-2.5 font-medium text-[#1a1a2e]">{v.name || "—"}</td>
-                        <td className="py-2.5 text-[#7c7ca0]">{v.value || "—"}</td>
-                        <td className="py-2.5 text-[#1a1a2e]">{v.price ? `₹${parseFloat(v.price).toLocaleString("en-IN")}` : "—"}</td>
-                        <td className="py-2.5 text-[#7c7ca0]">{v.stock ?? "—"}</td>
-                      </tr>
-                    ))}
+                    {p.variants.map((v, i) => {
+                      const hasSubVariants = v.subVariants?.length > 0;
+
+                      return (
+                        <Fragment key={i}>
+                          <tr className="border-b border-[#f9f9fc] last:border-0">
+                            <td className="py-2.5 font-medium text-[#1a1a2e]">{v.name || "—"}</td>
+                            <td className="py-2.5 text-[#7c7ca0]">{v.value || "—"}</td>
+                            <td className="py-2.5 text-[#1a1a2e]">
+                              {hasSubVariants
+                                ? <span className="text-[11px] uppercase tracking-widest text-[#b0b0cc]">Group</span>
+                                : v.price ? `₹${parseFloat(v.price).toLocaleString("en-IN")}` : "—"}
+                            </td>
+                            <td className="py-2.5 text-[#7c7ca0]">
+                              {hasSubVariants ? "—" : (v.stock ?? "—")}
+                            </td>
+                          </tr>
+                          {hasSubVariants &&
+                            v.subVariants.map((sv, si) => (
+                              <tr key={sv._id ?? si} className="border-b border-[#f9f9fc] last:border-0 bg-[#fafafd]">
+                                <td className="py-2 pl-6 text-[#7c7ca0]" colSpan={1}>
+                                  ↳ {sv.name || "—"}
+                                </td>
+                                <td className="py-2 text-[#7c7ca0]">{sv.value || "—"}</td>
+                                <td className="py-2 text-[#1a1a2e]">
+                                  {sv.price ? `₹${parseFloat(sv.price).toLocaleString("en-IN")}` : "—"}
+                                </td>
+                                <td className="py-2 text-[#7c7ca0]">{sv.stock ?? "—"}</td>
+                              </tr>
+                            ))}
+                        </Fragment>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -323,7 +374,11 @@ export default function ViewProduct() {
           {p.type === "physical" && (p.weight || p.dimensions?.length) && (
             <Card title="Shipping & Dimensions">
               <div className="grid grid-cols-2 gap-4">
-                <InfoRow icon={BarChart2} label="Weight" value={p.weight ? `${p.weight} g` : null} />
+                <InfoRow
+                  icon={BarChart2}
+                  label="Weight"
+                  value={p.weight ? `${p.weight} g` : null}
+                />
                 {(p.dimensions?.length || p.dimensions?.width || p.dimensions?.height) && (
                   <InfoRow
                     icon={Ruler}
@@ -373,33 +428,49 @@ export default function ViewProduct() {
           <Card title="Pricing">
             {finalPrice !== null && (
               <div className="rounded-xl bg-[#f5f4ff] border border-[#6c63ff]/20 px-4 py-3">
-                <p className="text-[11px] font-semibold uppercase tracking-widest text-[#9a9abf] mb-1">Final Price</p>
+                <p className="text-[11px] font-semibold uppercase tracking-widest text-[#9a9abf] mb-1">
+                  {p.soldByRatti ? "Price per Ratti" : "Final Price"}
+                </p>
                 <div className="flex items-baseline gap-2">
                   <span className="text-2xl font-bold text-[#6c63ff]">
                     ₹{finalPrice.toLocaleString("en-IN")}
+                    {p.soldByRatti && <span className="text-sm font-medium text-[#9a9abf]"> / ratti</span>}
                   </span>
                   {saving > 0 && (
                     <span className="text-sm text-[#b0b0cc] line-through">
-                      ₹{parseFloat(p.originalPrice).toLocaleString("en-IN")}
+                      ₹{mrp.toLocaleString("en-IN")}
                     </span>
                   )}
                 </div>
                 {saving > 0 && (
                   <p className="text-[11px] text-emerald-500 mt-0.5 font-medium">
                     Saving ₹{saving.toLocaleString("en-IN")}
-                    {p.discountType === "percentage" ? ` (${p.discountValue}% off)` : " off"}
+                    {p.discountType === "percentage" ? ` (${p.discountValue}% off)` : ""}
                   </p>
                 )}
               </div>
             )}
 
+            {finalPrice === null && (
+              <p className="text-sm text-[#b0b0cc]">
+                Priced per variant — see the Variants table.
+              </p>
+            )}
+
             <div className="flex flex-col gap-3 pt-1">
-              <InfoRow icon={DollarSign} label="Original Price" value={p.originalPrice ? `₹${parseFloat(p.originalPrice).toLocaleString("en-IN")}` : null} />
-              {p.discountValue && (
+              <InfoRow icon={DollarSign} label="MRP" value={mrp !== null ? `₹${mrp.toLocaleString("en-IN")}${p.soldByRatti ? " / ratti" : ""}` : null} />
+              {p.discountValue > 0 && (
                 <InfoRow
                   icon={Percent}
                   label="Discount"
                   value={p.discountType === "percentage" ? `${p.discountValue}%` : `₹${p.discountValue}`}
+                />
+              )}
+              {p.soldByRatti && (
+                <InfoRow
+                  icon={BarChart2}
+                  label="Ratti Range"
+                  value={`${p.minRatti ?? 1} – ${p.maxRatti ?? p.minRatti ?? 1} ratti`}
                 />
               )}
             </div>

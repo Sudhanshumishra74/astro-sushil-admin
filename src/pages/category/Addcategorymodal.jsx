@@ -129,6 +129,8 @@ export default function CategoryModal({ category, onClose }) {
           <ImageUpload
             value={form.image}
             onChange={(file) => setFile(file)}
+            enableCrop
+            cropAspect={4 / 3}
           />
         </div>
 

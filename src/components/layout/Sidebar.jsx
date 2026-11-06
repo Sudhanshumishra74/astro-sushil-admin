@@ -1,188 +1,22 @@
 /* eslint-disable no-unused-vars */
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import {
-  LayoutGrid,
-  Bot,
-  ShoppingCart,
-  Calendar,
-  User,
-  ChevronDown,
-  X,
-  Image,
-  Badge,
-  Quote,
-  CalendarClock,
-  CreditCard,
-  MessageSquare,
-  Globe,
-  Sparkles,
-  TicketPercent,
-  FileText,
-  ShieldCheck,
-  UserCog,
-} from "lucide-react";
+import { ChevronDown, X } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { usePermission } from "../../hooks/usePermission";
+import { useReturnStore } from "../../store/useReturnStore";
+import { menuItems } from "../../config/menuItems";
 
-const menuItems = [
-  {
-    category: "Main",
-    items: [{ id: 1, label: "Dashboard", icon: LayoutGrid, route: "/", permission: "dashboard.view" }],
-  },
-  {
-    category: "Catalog",
-    items: [
-      { id: 2, label: "Banners", icon: Image, route: "/banners", permission: "banners.view" },
-      { id: 3, label: "Categories", icon: Badge, route: "/categories", permission: "categories.view" },
-      {
-        id: 15,
-        label: "Courses",
-        icon: Calendar,
-        hasChildren: true,
-        children: [
-          { label: "Course List", route: "/courses", permission: "courses.view" },
-          { label: "Add Course", route: "/courses/add", permission: "courses.create" },
-        ],
-      },
-      {
-        id: 4,
-        label: "Products",
-        icon: Image,
-        hasChildren: true,
-        children: [
-          { label: "Product List", route: "/products", permission: "products.view" },
-          { label: "Add Product", route: "/products/add", permission: "products.create" },
-        ],
-      },
-      {
-        id: 16,
-        label: "Consultations",
-        icon: CalendarClock,
-        route: "/consultations",
-        permission: "consultations.view",
-      }, // ← Catalog mein add
-    ],
-  },
-  {
-    category: "Sales",
-    items: [
-      { id: 5, label: "Orders", icon: ShoppingCart, route: "/orders", permission: "orders.view" },
-      {
-        id: 22,
-        label: "Report Orders",
-        icon: FileText,
-        route: "/report-orders",
-        permission: "reportOrders.view",
-      },
-      {
-        id: 11,
-        label: "Transactions",
-        icon: CreditCard,
-        route: "/transactions",
-        permission: "transactions.view",
-      },
-      { id: 20, label: "Bookings", icon: CalendarClock, route: "/booking", permission: "bookings.view" },
-      {
-        id: 21,
-        label: "Coupons",
-        icon: TicketPercent,
-        route: "/coupons",
-        permission: "coupons.view",
-      },
-      {
-        id: 23,
-        label: "GST Report",
-        icon: FileText,
-        route: "/gst-report",
-        permission: "gstReport.view",
-      },
-    ],
-  },
-  {
-    category: "Users",
-    items: [
-      { id: 7, label: "Customers", icon: User, route: "/customers", permission: "customers.view" },
-      { id: 12, label: "Contacts", icon: MessageSquare, route: "/contacts", permission: "contacts.view" },
-    ],
-  },
-  {
-    category: "Content",
-    items: [
-      {
-        id: 8,
-        label: "Blogs",
-        icon: Bot,
-        hasChildren: true,
-        children: [
-          { label: "Blog List", route: "/blogs", permission: "blogs.view" },
-          { label: "Add Blog", route: "/blogs/add", permission: "blogs.create" },
-        ],
-      },
-      { id: 17, label: "FAQs", icon: MessageSquare, route: "/faqs", permission: "faqs.view" },
-      { id: 9, label: "Testimonials", icon: Quote, route: "/testimonials", permission: "testimonials.view" },
-      // Consultations yahan se hata diya
-    ],
-  },
-  {
-    category: "Media", // ← Naya Media section
-    items: [{ id: 18, label: "Media Manager", icon: Image, route: "/media", permission: "media.view" }],
-  },
-  {
-    category: "Global Setting",
-    items: [
-      {
-        id: 19,
-        label: "Global",
-        icon: Globe,
-        hasChildren: true,
-        children: [
-          { label: "Availability", route: "/global", permission: "availability.view" },
-          { label: "Calendar", route: "/callender", permission: "availability.view" }, // ← Calendar Global ke andar
-        ],
-      },
-    ],
-  },
-  {
-    category: "Settings",
-    items: [
-      {
-        id: 13,
-        label: "Settings",
-        icon: Globe,
-        hasChildren: true,
-        children: [
-          { label: "Privacy Policy", route: "/settings/privacy-policy", permission: "settings.view" },
-          {
-            label: "Terms & Conditions",
-            route: "/settings/terms-conditions",
-            permission: "settings.view",
-          },
-          {
-            label: "Cancellation & Refund Policy",
-            route: "/settings/Cancellation-Refund-Policy",
-            permission: "settings.view",
-          },
-          {
-            label: "Shipping Delivery Policy",
-            route: "/settings/shipping-delivery-policy",
-            permission: "settings.view",
-          },
-          { label: "Website Settings", route: "/settings/website", permission: "settings.view" },
-          { label: "SEO Settings", route: "/settings/seo", permission: "seo.view" },
-          { label: "Profile", route: "/profile" },
-        ],
-      },
-    ],
-  },
-  {
-    category: "Administration",
-    items: [
-      { id: 24, label: "Roles & Permissions", icon: ShieldCheck, route: "/roles", permission: "roles.view" },
-      { id: 25, label: "Staff Accounts", icon: UserCog, route: "/staff", permission: "staff.view" },
-    ],
-  },
-];
+// How often the Returns nav badge refreshes in the background. Also
+// re-fetched on every route change (see Sidebar below) so it's fresh
+// whenever an admin navigates away from a return they just actioned.
+const RETURN_BADGE_POLL_MS = 60000;
+
+const formatBadgeCount = (n) => (n > 0 ? (n > 99 ? "99+" : String(n)) : null);
+
+// The nav item id whose badge is populated from live pending-return data —
+// see RETURN_BADGE_ITEM_ID usage in SidebarContent below.
+const RETURN_BADGE_ITEM_ID = 28;
 
 function MenuItem({ item, isActive, isChildActive, isOpen, onToggle }) {
   const Icon = item.icon;
@@ -278,7 +112,7 @@ function MenuItem({ item, isActive, isChildActive, isOpen, onToggle }) {
   );
 }
 
-function SidebarContent({ onClose }) {
+function SidebarContent({ onClose, pendingReturnBadge }) {
   const location = useLocation();
   const { hasPermission } = usePermission();
 
@@ -292,7 +126,9 @@ function SidebarContent({ onClose }) {
         .map((item) =>
           item.hasChildren
             ? { ...item, children: (item.children ?? []).filter((c) => hasPermission(c.permission)) }
-            : item,
+            : item.id === RETURN_BADGE_ITEM_ID
+              ? { ...item, badge: pendingReturnBadge }
+              : item,
         )
         .filter((item) => (item.hasChildren ? item.children.length > 0 : hasPermission(item.permission))),
     }))
@@ -324,7 +160,7 @@ function SidebarContent({ onClose }) {
       <div className="flex items-center justify-between px-5 pt-6 pb-5 shrink-0">
         <div className="flex items-center gap-2.5">
           <span className="text-[15px] font-bold text-white tracking-tight">
-            Admin
+            Admin Panel
           </span>
         </div>
         <button
@@ -374,10 +210,32 @@ function SidebarContent({ onClose }) {
 }
 
 export default function Sidebar({ isOpen, onClose }) {
+  const location = useLocation();
+  const { hasPermission } = usePermission();
+  const pendingReturnCount = useReturnStore((s) => s.pendingReturnCount);
+  const fetchPendingReturnCount = useReturnStore((s) => s.fetchPendingReturnCount);
+
+  // Fetched once here (not inside SidebarContent, which mounts twice — once
+  // for the always-present desktop rail, once for the mobile drawer) so
+  // opening the mobile drawer doesn't double the request/poll. Refreshed on
+  // every route change plus a background poll, so the count catches up
+  // after an admin actions a return from the Returns/Order detail page
+  // without needing a full reload.
+  useEffect(() => {
+    if (!hasPermission("returns.view")) return undefined;
+
+    fetchPendingReturnCount();
+    const interval = setInterval(fetchPendingReturnCount, RETURN_BADGE_POLL_MS);
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname, hasPermission]);
+
+  const pendingReturnBadge = hasPermission("returns.view") ? formatBadgeCount(pendingReturnCount) : null;
+
   return (
     <>
       <div className="hidden lg:flex lg:shrink-0">
-        <SidebarContent onClose={onClose} />
+        <SidebarContent onClose={onClose} pendingReturnBadge={pendingReturnBadge} />
       </div>
 
       <AnimatePresence>
@@ -398,7 +256,7 @@ export default function Sidebar({ isOpen, onClose }) {
               transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
               className="fixed top-0 left-0 h-full z-50 lg:hidden"
             >
-              <SidebarContent onClose={onClose} />
+              <SidebarContent onClose={onClose} pendingReturnBadge={pendingReturnBadge} />
             </motion.div>
           </>
         )}

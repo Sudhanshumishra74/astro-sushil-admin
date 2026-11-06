@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import Toppage from "../../components/common/Toppage";
 import { Badge } from "../../components/common/Admintable";
 import { Modal } from "../../components/common/Modal";
+import PriceBreakdown from "../../components/common/PriceBreakdown";
 import { usePaymentStore } from "../../store/usePaymentStore";
 import DateFilter from "../../components/common/DateFilter";
 
@@ -16,6 +17,13 @@ const STATUS_VARIANTS = {
   failed: "danger",
   pending: "warning",
   refunded: "info",
+};
+
+const TYPE_LABEL = {
+  order: "Payment",
+  consultation: "Payment",
+  report: "Payment",
+  refund: "Refund",
 };
 
 export default function TransactionsPage() {
@@ -155,10 +163,11 @@ export default function TransactionsPage() {
                   <tr className="border-b border-[#ede8f8] bg-white">
                     {[
                       "Txn ID",
+                      "Type",
                       "User",
                       "Amount",
                       "Method",
-                      "Razorpay Order",
+                      "Reference ID",
                       "Status",
                       "Date",
                       "Actions",
@@ -175,7 +184,7 @@ export default function TransactionsPage() {
                 <tbody>
                   {transactionsLoading ? (
                     <tr>
-                      <td colSpan={8} className="px-4 py-16 text-center">
+                      <td colSpan={9} className="px-4 py-16 text-center">
                         <div className="flex flex-col items-center gap-2 text-gray-400">
                           <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
                           <p className="text-sm">Loading transactions...</p>
@@ -184,7 +193,7 @@ export default function TransactionsPage() {
                     </tr>
                   ) : transactions.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="px-4 py-16 text-center">
+                      <td colSpan={9} className="px-4 py-16 text-center">
                         <div className="flex flex-col items-center gap-2 text-gray-400">
                           <CreditCard size={32} className="text-[#c0b8d8]" />
                           <p className="text-sm">No transactions found.</p>
@@ -206,6 +215,12 @@ export default function TransactionsPage() {
                             {row.transactionId || row._id}
                           </td>
                           <td className="px-4 py-3.5">
+                            <Badge
+                              label={TYPE_LABEL[row.transactionType] || "Payment"}
+                              variant={row.transactionType === "refund" ? "danger" : "default"}
+                            />
+                          </td>
+                          <td className="px-4 py-3.5">
                             <p className="text-sm font-semibold text-black">
                               {row.user?.firstName}
                             </p>
@@ -216,7 +231,12 @@ export default function TransactionsPage() {
                               {row.user?.phoneNumber}
                             </p>
                           </td>
-                          <td className="px-4 py-3.5 text-sm font-semibold text-black whitespace-nowrap">
+                          <td
+                            className={`px-4 py-3.5 text-sm font-semibold whitespace-nowrap ${
+                              row.transactionType === "refund" ? "text-red-500" : "text-black"
+                            }`}
+                          >
+                            {row.transactionType === "refund" ? "− " : ""}
                             {row.currency.toLowerCase() === "inr" ? "₹" : "$"}
                             {row.amount?.toLocaleString("en-IN")}
                           </td>
@@ -224,7 +244,18 @@ export default function TransactionsPage() {
                             {row.method}
                           </td>
                           <td className="px-4 py-3.5 text-xs font-mono text-[#9a9abf] max-w-40">
-                            <p className="truncate">{row.razorpayOrderId}</p>
+                            {row.transactionType === "refund" ? (
+                              <>
+                                <p className="truncate">{row.razorpayRefundId || "—"}</p>
+                                {row.refundOf?.transactionId && (
+                                  <p className="truncate text-[#c0b8d8]">
+                                    of {row.refundOf.transactionId}
+                                  </p>
+                                )}
+                              </>
+                            ) : (
+                              <p className="truncate">{row.razorpayOrderId || "—"}</p>
+                            )}
                           </td>
                           <td className="px-4 py-3.5 flex flex-col items-center gap-2">
                             <Badge
@@ -312,8 +343,15 @@ export default function TransactionsPage() {
                 <div>
                   <p className="text-xs text-[#9a9abf] mb-1">Transaction ID</p>
                   <p className="text-sm font-mono font-semibold text-black break-all">
-                    {active.transactionId}
+                    {active.transactionId || active._id}
                   </p>
+                </div>
+                <div>
+                  <p className="text-xs text-[#9a9abf] mb-1">Type</p>
+                  <Badge
+                    label={TYPE_LABEL[active.transactionType] || "Payment"}
+                    variant={active.transactionType === "refund" ? "danger" : "default"}
+                  />
                 </div>
                 <div>
                   <p className="text-xs text-[#9a9abf] mb-1">Status</p>
@@ -344,12 +382,6 @@ export default function TransactionsPage() {
                   </p>
                 </div>
                 <div>
-                  <p className="text-xs text-[#9a9abf] mb-1">Amount</p>
-                  <p className="text-sm font-bold text-black">
-                    ₹{active.amount.toLocaleString()}
-                  </p>
-                </div>
-                <div>
                   <p className="text-xs text-[#9a9abf] mb-1">Method</p>
                   <p className="text-sm text-black capitalize">
                     {active.method}
@@ -362,12 +394,62 @@ export default function TransactionsPage() {
                   </p>
                 </div>
               </div>
-              <div>
-                <p className="text-xs text-[#9a9abf] mb-1">Razorpay Order ID</p>
-                <p className="text-sm font-mono text-black bg-[#faf8ff] border border-[#ede8f8] rounded-xl p-3 break-all">
-                  {active.razorpayOrderId}
-                </p>
-              </div>
+              {active.transactionType === "refund" ? (
+                <div>
+                  <p className="text-xs text-[#9a9abf] mb-2">Refund Details</p>
+                  <div className="bg-red-50 border border-red-100 rounded-xl p-4 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-red-500">Refund Amount</span>
+                      <span className="text-sm font-semibold text-red-600">
+                        − {active.currency?.toLowerCase() === "inr" ? "₹" : "$"}
+                        {active.amount?.toLocaleString("en-IN")}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-red-500">Refunded Via</span>
+                      <span className="text-sm text-red-700 capitalize">{active.method}</span>
+                    </div>
+                    {active.razorpayRefundId && (
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-xs text-red-500 shrink-0">Refund ID</span>
+                        <span className="text-xs font-mono text-red-700 break-all text-right">
+                          {active.razorpayRefundId}
+                        </span>
+                      </div>
+                    )}
+                    {active.refundOf?.transactionId && (
+                      <div className="flex items-center justify-between gap-3 pt-2 border-t border-red-200">
+                        <span className="text-xs text-red-500 shrink-0">Original Payment</span>
+                        <span className="text-xs font-mono text-red-700 break-all text-right">
+                          {active.refundOf.transactionId}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div>
+                    <p className="text-xs text-[#9a9abf] mb-2">Payment Breakdown</p>
+                    <div className="bg-[#faf8ff] border border-[#ede8f8] rounded-xl px-3">
+                      <PriceBreakdown
+                        subTotal={active.subTotal}
+                        discount={active.discount}
+                        shipping={active.shipping}
+                        tax={active.tax}
+                        totalAmount={active.amount}
+                        currency={active.currency}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-xs text-[#9a9abf] mb-1">Razorpay Order ID</p>
+                    <p className="text-sm font-mono text-black bg-[#faf8ff] border border-[#ede8f8] rounded-xl p-3 break-all">
+                      {active.razorpayOrderId}
+                    </p>
+                  </div>
+                </>
+              )}
               <div className="flex justify-end pt-2">
                 <button
                   onClick={() => setModal(null)}

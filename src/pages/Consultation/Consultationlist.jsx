@@ -107,7 +107,7 @@ const ExpandedRow = ({ consultation }) => (
     transition={{ duration: 0.25 }}
   >
     <td colSpan={7} className="px-0 py-0">
-      <div className="mx-4 mb-3 px-5 py-4 bg-[#faf8ff] rounded-xl border border-[#ede8f8] grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
+      <div className="mx-4 mb-3 px-5 py-4 bg-[#faf8ff] rounded-b-xl border border-[#ede8f8] grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
 
         {/* Mode Pricing breakdown */}
         {consultation.modes?.length > 0 && (

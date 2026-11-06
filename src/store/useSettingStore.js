@@ -158,25 +158,6 @@ export const useSettingStore = create((set, get) => ({
     }
   },
 
-  updateContactRemarks: async (id, remarks) => {
-    try {
-      const res = await api.patch(`/inquiry/contact/${id}/remarks`, { remarks });
-
-      const updated = res.data.data;
-
-      set((state) => ({
-        contacts: state.contacts.map((c) => (c._id === id ? updated : c)),
-        contact: state.contact?._id === id ? updated : state.contact,
-      }));
-
-      showSuccess(res.data.message || "Remarks updated successfully");
-      return updated;
-    } catch (err) {
-      showError(err);
-      return null;
-    }
-  },
-
   clearContact: () => set({ contact: null }),
 
   testimonials: [],

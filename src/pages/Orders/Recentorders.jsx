@@ -93,7 +93,7 @@ export default function RecentOrders() {
                   {/* Order ID */}
                   <td className="py-2.5 pr-3">
                     <span className="font-mono text-xs text-primary font-semibold">
-                      #{(o._id ?? "").slice(-6).toUpperCase()}
+                      #{(o._id ?? "").slice(-8).toUpperCase()}
                     </span>
                   </td>
 

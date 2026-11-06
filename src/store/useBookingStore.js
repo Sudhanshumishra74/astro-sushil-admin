@@ -9,6 +9,10 @@ export const useBookingStore = create((set) => ({
   deleting: false,
   rescheduling: false,
 
+  productResults: [],
+  searchingProducts: false,
+  recommending: false,
+
   fetchBookings: async ({ fromDate = "", toDate = "", search = "" } = {}) => {
     try {
       set({ loading: true });
@@ -84,6 +88,50 @@ export const useBookingStore = create((set) => ({
       return false;
     } finally {
       set({ loading: false });
+    }
+  },
+
+  // Scoped to this store (not the shared useProductStore) so a search here
+  // never clobbers the main Products page's own list/pagination/filter
+  // state if both happen to be mounted.
+  searchProducts: async (query) => {
+    if (!query?.trim()) {
+      set({ productResults: [] });
+      return;
+    }
+    try {
+      set({ searchingProducts: true });
+      const res = await api.get("/products/admin", {
+        params: { search: query, limit: 25 },
+      });
+      set({ productResults: res.data.data || [] });
+    } catch (err) {
+      console.error("Product search error:", err);
+    } finally {
+      set({ searchingProducts: false });
+    }
+  },
+
+  // Appends — calling this again on the same booking adds another batch of
+  // recommendations rather than replacing the existing ones.
+  recommendProducts: async (bookingId, items) => {
+    try {
+      set({ recommending: true });
+      const res = await api.patch(`/booking/bookings/${bookingId}/recommendations`, { items });
+      const recommendedProducts = res.data.data;
+      set((state) => ({
+        bookings: state.bookings.map((b) =>
+          b._id === bookingId ? { ...b, recommendedProducts } : b,
+        ),
+      }));
+      showSuccess(res);
+      return true;
+    } catch (err) {
+      console.error("Recommend products error:", err);
+      showError(err);
+      return false;
+    } finally {
+      set({ recommending: false });
     }
   },
 

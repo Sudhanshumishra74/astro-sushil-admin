@@ -15,6 +15,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Eye,
+  Star,
+  Loader2,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useProductStore } from "../../store/useProductStore";
@@ -31,6 +33,66 @@ function StockBadge({ stock }) {
     >
       {isIn ? "In Stock" : "Out of Stock"}
     </span>
+  );
+}
+
+function getDisplayPrice(product) {
+  if (!product.hasVariants) {
+    const base = product.mrp ?? null;
+    const final = product.price ?? product.discountedPrice ?? base;
+    return {
+      base,
+      baseLabel: "MRP",
+      final,
+      finalLabel: product.soldByRatti ? "/ ratti" : null,
+      isFrom: false,
+    };
+  }
+
+  const leaves = (product.variants || []).flatMap((v) =>
+    v.subVariants?.length ? v.subVariants : [v],
+  );
+
+  const cheapest = leaves.reduce((min, leaf) => {
+    if (leaf.price == null) return min;
+    return min == null || leaf.price < min.price ? leaf : min;
+  }, null);
+
+  return {
+    base: cheapest?.mrp ?? null,
+    baseLabel: "MRP",
+    final: cheapest?.price ?? null,
+    finalLabel: null,
+    isFrom: true,
+  };
+}
+
+function StatusToggle({ product, pending, onToggle }) {
+  const isPublished = Boolean(product.isPublished);
+
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      disabled={pending}
+      title={isPublished ? "Published — click to unpublish" : "Draft — click to publish"}
+      className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed ${
+        isPublished
+          ? "bg-green-50 text-green-700 border-green-200 hover:bg-green-100"
+          : "bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100"
+      }`}
+    >
+      {pending ? (
+        <Loader2 size={12} className="shrink-0 animate-spin" />
+      ) : (
+        <span
+          className={`h-2 w-2 shrink-0 rounded-full ${
+            isPublished ? "bg-green-500" : "bg-gray-400"
+          }`}
+        />
+      )}
+      <span>{isPublished ? "Published" : "Draft"}</span>
+    </button>
   );
 }
 
@@ -87,6 +149,12 @@ function DeleteModal({ product, onClose, onConfirm, loading }) {
   );
 }
 
+const TYPE_OPTIONS = [
+  { value: "", label: "All Types" },
+  { value: "physical", label: "Physical" },
+  { value: "digital", label: "Digital" },
+];
+
 function SkeletonRow() {
   return (
     <tr className="border-b border-[#f5f2fc]">
@@ -111,8 +179,10 @@ export default function ProductsPage() {
     page,
     limit,
     search,
+    type,
     fetchProducts,
     deleteProduct,
+    toggleProductStatus,
     setPage,
   } = useProductStore();
 
@@ -120,6 +190,7 @@ export default function ProductsPage() {
   const [searchInput, setSearchInput] = useState(search);
   const [selected, setSelected] = useState([]);
   const [deleting, setDeleting] = useState(false);
+  const [togglingId, setTogglingId] = useState(null);
 
 
   useEffect(() => {
@@ -136,6 +207,10 @@ export default function ProductsPage() {
     return () => clearTimeout(t);
   }, [searchInput]);
 
+  const handleTypeChange = (val) => {
+    fetchProducts({ type: val, page: 1 });
+  };
+
 const totalPages =
   Math.ceil(Number(total) / Number(limit || 10)) || 1;
 
@@ -144,6 +219,12 @@ const totalPages =
     await deleteProduct(deleteTarget._id);
     setDeleting(false);
     setDeleteTarget(null);
+  };
+
+  const handleToggleStatus = async (product) => {
+    setTogglingId(product._id);
+    await toggleProductStatus(product._id, !product.isPublished);
+    setTogglingId(null);
   };
 
   const toggleSelect = (id) =>
@@ -213,10 +294,17 @@ const totalPages =
                 className="w-full pl-9 pr-4 py-2.5 text-sm bg-[#f7f7fb] border border-[#d8d0ee] rounded-xl text-[#1a1a2e] placeholder-[#b0a8c8] outline-none focus:border-[#6c63ff] focus:ring-2 focus:ring-[#6c63ff]/10 transition-all"
               />
             </div>
-            {/* <button className="flex items-center gap-1.5 px-4 py-2.5 border border-[#d8d0ee] rounded-xl text-sm text-[#1a1a2e] font-medium bg-white hover:bg-[#f5f2fc] transition-colors cursor-pointer">
-              <SlidersHorizontal size={14} />
-              Filter
-            </button> */}
+            <div className="flex items-center gap-2">
+              <select
+                value={type}
+                onChange={(e) => handleTypeChange(e.target.value)}
+                className="px-3 py-2.5 text-sm bg-[#f7f7fb] border border-[#d8d0ee] rounded-xl text-[#1a1a2e] outline-none focus:border-[#6c63ff] focus:ring-2 focus:ring-[#6c63ff]/10 transition-all cursor-pointer"
+              >
+                {TYPE_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            </div>
           </div>
 
           {/* Table */}
@@ -228,8 +316,8 @@ const totalPages =
                     "Product",
                     "Category",
                     "SKU",
-                   
-                    // "Stock",
+                    "Price",
+                    "Status",
                     "Created At",
                     "Action",
                   ].map((h) => (
@@ -300,9 +388,17 @@ const totalPages =
                               )}
                             </div>
                             <div>
-                              <p className="text-sm font-semibold text-[#1a1a2e] whitespace-nowrap max-w-45 truncate">
-                                {product.name}
-                              </p>
+                              <div className="flex items-center gap-1.5">
+                                <p className="text-sm font-semibold text-[#1a1a2e] whitespace-nowrap max-w-45 truncate">
+                                  {product.name}
+                                </p>
+                                {product.isFeatured && (
+                                  <Star
+                                    size={12}
+                                    className="text-amber-400 fill-amber-400 shrink-0"
+                                  />
+                                )}
+                              </div>
                               {product.type && (
                                 <p className="text-[11px] text-[#b0a8c8] capitalize">
                                   {product.type}
@@ -320,30 +416,45 @@ const totalPages =
                           {product.sku || "—"}
                         </td>
 
-                        {/* <td className="px-4 py-4">
-                          <div className="flex flex-col">
-                            <span className="text-sm font-semibold text-[#1a1a2e]">
-                              ₹
-                              {Number(
-                                product.price ?? product.originalPrice,
-                              ).toLocaleString("en-IN")}
-                            </span>
-                            {product.originalPrice &&
-                              product.price &&
-                              product.originalPrice !== product.price && (
-                                <span className="text-[11px] text-[#b0a8c8] line-through">
-                                  ₹
-                                  {Number(product.originalPrice).toLocaleString(
-                                    "en-IN",
+                        <td className="px-4 py-4">
+                          {(() => {
+                            const { base, baseLabel, final, finalLabel, isFrom } = getDisplayPrice(product);
+                            if (final == null && base == null) {
+                              return <span className="text-sm text-[#b0a8c8]">—</span>;
+                            }
+                            const hasDiscount =
+                              !finalLabel && base != null && final != null && base > final;
+                            return (
+                              <div className="flex flex-col">
+                                <span className="text-sm font-semibold text-[#1a1a2e]">
+                                  {isFrom && <span className="text-[11px] font-normal text-[#b0a8c8]">From </span>}
+                                  ₹{Number(final ?? base).toLocaleString("en-IN")}
+                                  {finalLabel && (
+                                    <span className="text-[11px] font-normal text-[#b0a8c8]"> {finalLabel}</span>
                                   )}
                                 </span>
-                              )}
-                          </div>
-                        </td> */}
+                                {/* Always shown, not just when discounted — an
+                                    admin comparing MRP vs. selling price needs
+                                    both numbers even when they're equal. */}
+                                {base != null && (
+                                  <span
+                                    className={`text-[11px] text-[#b0a8c8] ${hasDiscount ? "line-through" : ""}`}
+                                  >
+                                    {baseLabel} ₹{Number(base).toLocaleString("en-IN")}
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })()}
+                        </td>
 
-                        {/* <td className="px-4 py-4">
-                          <StockBadge stock={product.stock} />
-                        </td> */}
+                        <td className="px-4 py-4">
+                          <StatusToggle
+                            product={product}
+                            pending={togglingId === product._id}
+                            onToggle={() => handleToggleStatus(product)}
+                          />
+                        </td>
 
                         <td className="px-4 py-4 text-sm text-[#9a9abf] whitespace-nowrap">
                           {product.createdAt

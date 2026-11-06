@@ -27,6 +27,8 @@ import {
   ArrowDown,
   ArrowUpDown,
   Download,
+  Sparkles,
+  Package,
 } from "lucide-react";
 
 import { useConsultationStore } from "../../store/useConsultationStore";
@@ -491,7 +493,321 @@ const ChangePlanModal = ({ open, booking, consultations, onClose, onSave }) => {
   );
 };
 
-const ExpandedRow = ({ booking }) => (
+// Recommend Products Modal — search is scoped to this store's own
+// productResults (not the shared useProductStore the Products page uses),
+// so opening this never disturbs that page's list/filters if it's mounted
+// elsewhere. Each submit appends a fresh batch (never replaces), and the
+// customer gets one email per batch, not per booking.
+// Small uppercase pill for a product's externalMeta facet (quality/origin/
+// shape) — same three-letter-abbreviation-free plain-text style as the rest
+// of the admin, just compact enough to sit inline in a search result row.
+const MetaPill = ({ label }) => (
+  <span className="px-1.5 py-0.5 rounded-md bg-[#f3f0fb] text-[#6b6b8a] text-[10px] font-semibold uppercase tracking-wide">
+    {label}
+  </span>
+);
+
+const ProductThumb = ({ src, alt, size = 40 }) => (
+  <div
+    className="rounded-lg overflow-hidden shrink-0 bg-[#f3f0fb] flex items-center justify-center"
+    style={{ width: size, height: size }}
+  >
+    {src ? (
+      <img src={src} alt={alt || ""} className="w-full h-full object-cover" />
+    ) : (
+      <Package size={size * 0.45} className="text-[#c0b8d8]" />
+    )}
+  </div>
+);
+
+const StockBadge = ({ stock }) => {
+  if (stock == null) return null;
+  if (stock <= 0) {
+    return (
+      <span className="px-1.5 py-0.5 rounded-md bg-red-50 text-red-600 text-[10px] font-semibold uppercase tracking-wide">
+        Out of stock
+      </span>
+    );
+  }
+  if (stock <= 5) {
+    return (
+      <span className="px-1.5 py-0.5 rounded-md bg-orange-50 text-orange-600 text-[10px] font-semibold uppercase tracking-wide">
+        Low stock · {stock}
+      </span>
+    );
+  }
+  return (
+    <span className="px-1.5 py-0.5 rounded-md bg-green-50 text-green-700 text-[10px] font-semibold uppercase tracking-wide">
+      In stock
+    </span>
+  );
+};
+
+const RecommendProductsModal = ({ open, booking, onClose }) => {
+  const {
+    productResults,
+    searchingProducts,
+    searchProducts,
+    recommendProducts,
+    recommending,
+  } = useBookingStore();
+
+  const [query, setQuery] = useState("");
+  const [pending, setPending] = useState([]);
+  const debounceRef = useRef(null);
+
+  useEffect(() => {
+    if (!open) {
+      setQuery("");
+      setPending([]);
+    }
+  }, [open]);
+
+  const handleQueryChange = (val) => {
+    setQuery(val);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => searchProducts(val), 350);
+  };
+
+  const addPending = (product) => {
+    if (pending.some((p) => p.productId === product._id)) return;
+    setPending((prev) => [
+      ...prev,
+      {
+        productId: product._id,
+        name: product.name,
+        thumbnail: product.thumbnail,
+        categoryName: product.category?.name,
+        externalMeta: product.externalMeta,
+        note: "",
+      },
+    ]);
+    setQuery("");
+    searchProducts("");
+  };
+
+  const updateNote = (productId, note) => {
+    setPending((prev) =>
+      prev.map((p) => (p.productId === productId ? { ...p, note } : p)),
+    );
+  };
+
+  const removePending = (productId) => {
+    setPending((prev) => prev.filter((p) => p.productId !== productId));
+  };
+
+  const handleSubmit = async () => {
+    if (!pending.length) return;
+    const ok = await recommendProducts(
+      booking._id,
+      pending.map(({ productId, note }) => ({ productId, note })),
+    );
+    if (ok) onClose();
+  };
+
+  return (
+    <AnimatePresence>
+      {open && (
+        <>
+          <motion.div
+            variants={overlayVariants}
+            initial="hidden"
+            animate="visible"
+            exit="exit"
+            className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50"
+            onClick={onClose}
+          />
+          <motion.div
+            initial={{ opacity: 0, scale: 0.85, y: 30 }}
+            animate={{
+              opacity: 1,
+              scale: 1,
+              y: 0,
+              transition: { duration: 0.3, ease: [0.22, 1, 0.36, 1] },
+            }}
+            exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.2 } }}
+            className="fixed z-50 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-lg bg-white border border-[#e0d9f5] rounded-2xl p-6 shadow-2xl max-h-[85vh] overflow-y-auto"
+          >
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-gold/10 flex items-center justify-center">
+                  <Sparkles size={18} className="text-gold" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-black leading-tight">Recommend Products</h3>
+                  <p className="text-[11px] text-[#9a9abf] mt-0.5">
+                    Sent to the customer by email once you submit
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={onClose}
+                className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-secondary text-[#b0a8c8] hover:text-black transition-colors"
+              >
+                <X size={14} />
+              </button>
+            </div>
+
+            {booking && (
+              <div className="flex items-center gap-2.5 mb-4 bg-[#faf8ff] border border-[#ede8f8] rounded-xl px-3.5 py-3">
+                <div className="w-8 h-8 rounded-lg bg-secondary text-primary flex items-center justify-center text-xs font-black shrink-0">
+                  {booking.customer?.firstName?.[0]?.toUpperCase() ?? "?"}
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold text-black leading-tight">
+                    {booking.customer?.firstName ?? "Customer"}
+                  </p>
+                  <p className="text-[11px] text-[#9a9abf] mt-0.5 truncate">
+                    {booking.consultation?.title ?? "Consultation"}
+                    {booking.mode ? ` · ${booking.mode.charAt(0).toUpperCase()}${booking.mode.slice(1)}` : ""}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            <div className="mb-3">
+              {/* `relative` scoped to just this row — the icon's `top-1/2`
+                  centers against this wrapper's own height, not the taller
+                  box below once results render, which is why the dropdown
+                  is a sibling after this div rather than nested inside it. */}
+              <div className="relative">
+                <Search
+                  size={14}
+                  className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#b0a8c8]"
+                />
+                <input
+                  value={query}
+                  onChange={(e) => handleQueryChange(e.target.value)}
+                  placeholder="Search products by name..."
+                  className="w-full bg-white border border-[#d8d0ee] rounded-xl pl-9 pr-4 py-2.5 text-sm text-black placeholder-[#b0a8c8] focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all"
+                />
+              </div>
+
+              {query && (
+                // Deliberately in normal flow, not `absolute` — this modal's
+                // own panel is `overflow-y-auto` with a bounded max-height,
+                // and an absolutely-positioned child can't escape past an
+                // ancestor's overflow clipping, so a floating dropdown here
+                // got cut off after the first result no matter how many
+                // matches there were. In-flow lets the modal's own scroll
+                // reach every result instead.
+                <div className="mt-1.5 bg-white border border-[#e0d9f5] rounded-xl shadow-sm max-h-72 overflow-y-auto">
+                  {searchingProducts && (
+                    <div className="flex items-center justify-center py-6">
+                      <Loader2 size={16} className="animate-spin text-primary" />
+                    </div>
+                  )}
+                  {!searchingProducts && productResults.length === 0 && (
+                    <p className="text-xs text-black py-6 text-center">No products found</p>
+                  )}
+                  {!searchingProducts &&
+                    productResults.map((p) => {
+                      const meta = p.externalMeta || {};
+                      const alreadyAdded = pending.some((item) => item.productId === p._id);
+                      return (
+                        <button
+                          key={p._id}
+                          type="button"
+                          disabled={alreadyAdded}
+                          onClick={() => addPending(p)}
+                          className="w-full flex items-center gap-3 px-3 py-3 hover:bg-[#faf8ff] transition-colors text-left border-b border-[#f3f0fb] last:border-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <ProductThumb src={p.thumbnail} alt={p.name} size={44} />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-semibold text-black truncate">{p.name}</p>
+                            {p.category?.name && (
+                              <p className="text-[11px] text-[#9a9abf] mt-0.5 truncate">
+                                {p.category.name}
+                              </p>
+                            )}
+                            <div className="flex items-center gap-1 mt-1 flex-wrap">
+                              {meta.quality && <MetaPill label={meta.quality} />}
+                              {meta.origin && <MetaPill label={meta.origin} />}
+                              {meta.shape && <MetaPill label={meta.shape} />}
+                              <StockBadge stock={p.stock} />
+                            </div>
+                          </div>
+                          {alreadyAdded && (
+                            <span className="text-[10px] text-primary font-semibold shrink-0">Added</span>
+                          )}
+                        </button>
+                      );
+                    })}
+                </div>
+              )}
+            </div>
+
+            {pending.length > 0 && (
+              <div className="mb-4">
+                <p className="text-[11px] font-semibold text-black uppercase tracking-wider mb-2">
+                  To Recommend ({pending.length})
+                </p>
+                <div className="space-y-2.5">
+                  {pending.map((item) => {
+                    const meta = item.externalMeta || {};
+                    return (
+                      <div
+                        key={item.productId}
+                        className="border border-[#ede8f8] bg-[#faf8ff] rounded-xl p-3"
+                      >
+                        <div className="flex items-start gap-2.5 mb-2">
+                          <ProductThumb src={item.thumbnail} alt={item.name} size={36} />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-semibold text-black truncate">{item.name}</p>
+                            {item.categoryName && (
+                              <p className="text-[11px] text-[#9a9abf] mt-0.5">{item.categoryName}</p>
+                            )}
+                            <div className="flex items-center gap-1 mt-1 flex-wrap">
+                              {meta.quality && <MetaPill label={meta.quality} />}
+                              {meta.origin && <MetaPill label={meta.origin} />}
+                              {meta.shape && <MetaPill label={meta.shape} />}
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => removePending(item.productId)}
+                            className="text-[#b0a8c8] hover:text-red-500 transition-colors shrink-0"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
+                        <textarea
+                          value={item.note}
+                          onChange={(e) => updateNote(item.productId, e.target.value)}
+                          placeholder="Optional note for the customer..."
+                          rows={2}
+                          className="w-full bg-white border border-[#d8d0ee] rounded-lg px-2.5 py-2 text-xs text-black placeholder-[#b0a8c8] focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all resize-none"
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            <div className="flex gap-3">
+              <button
+                onClick={onClose}
+                className="flex-1 py-2.5 rounded-xl border border-[#d8d0ee] text-black text-sm font-medium hover:bg-secondary transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSubmit}
+                disabled={!pending.length || recommending}
+                className="flex-1 py-2.5 rounded-xl bg-primary hover:bg-[#363b62] text-white text-sm font-bold transition-colors flex items-center justify-center gap-2 disabled:opacity-60"
+              >
+                {recommending && <Loader2 size={14} className="animate-spin" />}
+                Send Recommendation{pending.length > 1 ? "s" : ""}
+              </button>
+            </div>
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
+  );
+};
+
+const ExpandedRow = ({ booking, onRecommend }) => (
   <motion.tr
     initial={{ opacity: 0 }}
     animate={{ opacity: 1 }}
@@ -499,7 +815,7 @@ const ExpandedRow = ({ booking }) => (
     transition={{ duration: 0.25 }}
   >
     <td colSpan={7} className="px-0 py-0">
-      <div className="mx-4 mb-3 px-5 py-4 bg-[#faf8ff] rounded-xl border border-[#ede8f8] grid grid-cols-2 md:grid-cols-3 gap-4 text-xs">
+      <div className="mx-4 mb-3 px-5 py-4 bg-[#faf8ff] rounded-b-xl border border-[#ede8f8] grid grid-cols-2 md:grid-cols-3 gap-4 text-xs">
         <div>
           <p className="font-semibold text-black uppercase tracking-wider mb-1.5">
             Customer Info
@@ -532,6 +848,45 @@ const ExpandedRow = ({ booking }) => (
             <p className="text-black italic">{booking.note}</p>
           </div>
         )}
+
+        <div className="col-span-2 md:col-span-3 pt-3 border-t border-[#ede8f8]">
+          <div className="flex items-center justify-between mb-2">
+            <p className="font-semibold text-black uppercase tracking-wider flex items-center gap-1.5">
+              <Sparkles size={12} className="text-gold" /> Recommended Products
+            </p>
+            <button
+              onClick={() => onRecommend(booking)}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-gold/10 hover:bg-gold/20 border border-gold/30 text-gold text-xs font-semibold transition-all"
+            >
+              <Plus size={11} /> Recommend
+            </button>
+          </div>
+
+          {booking.recommendedProducts?.length > 0 ? (
+            // No remove action here — the customer's already been emailed
+            // this recommendation by the time it shows up in this list, so
+            // deleting it would only edit the admin's own record without
+            // un-sending anything, leaving the booking silently
+            // inconsistent with what the customer was actually told.
+            // Removal is only offered pre-send, in the modal's staged list.
+            <div className="flex flex-wrap gap-2">
+              {booking.recommendedProducts.map((r) => (
+                <div
+                  key={r._id}
+                  className="flex items-center gap-2 bg-white border border-[#e0d9f5] rounded-lg pl-1.5 pr-2.5 py-1.5"
+                  title={r.note || ""}
+                >
+                  <ProductThumb src={r.product?.thumbnail} alt={r.product?.name} size={22} />
+                  <span className="text-black font-medium truncate max-w-32">
+                    {r.product?.name || "Product"}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-black">No products recommended yet.</p>
+          )}
+        </div>
       </div>
 
       {/* Staff-only history — never shown to the customer (unlike `note`
@@ -583,6 +938,7 @@ const BookingTable = ({
   setDeleteId,
   onReschedule,
   onChangePlan,
+  onRecommend,
   showReschedule = true,
   sortOrder,
   setSortOrder,
@@ -800,7 +1156,11 @@ const BookingTable = ({
 
                     <AnimatePresence>
                       {expandedId === b._id && (
-                        <ExpandedRow key={`exp-${b._id}`} booking={b} />
+                        <ExpandedRow
+                          key={`exp-${b._id}`}
+                          booking={b}
+                          onRecommend={onRecommend}
+                        />
                       )}
                     </AnimatePresence>
                   </React.Fragment>
@@ -835,6 +1195,7 @@ export default function BookingList() {
   const [activeTab, setActiveTab] = useState("upcoming");
   const [sortOrder, setSortOrder] = useState("asc");
   const [planFilter, setPlanFilter] = useState("");
+  const [recommendBooking, setRecommendBooking] = useState(null);
 
   const [rescheduleBooking_, setRescheduleBooking] = useState(null);
   const [changePlanBooking, setChangePlanBooking] = useState(null);
@@ -1101,6 +1462,7 @@ export default function BookingList() {
                 setDeleteId={setDeleteId}
                 onReschedule={(b) => setRescheduleBooking(b)}
                 onChangePlan={(b) => setChangePlanBooking(b)}
+                onRecommend={(b) => setRecommendBooking(b)}
                 showReschedule={true}
                 sortOrder={sortOrder}
                 setSortOrder={setSortOrder}
@@ -1151,6 +1513,12 @@ export default function BookingList() {
         consultations={consultations}
         onClose={() => setChangePlanBooking(null)}
         onSave={handleChangePlan}
+      />
+
+      <RecommendProductsModal
+        open={!!recommendBooking}
+        booking={recommendBooking}
+        onClose={() => setRecommendBooking(null)}
       />
     </div>
   );
