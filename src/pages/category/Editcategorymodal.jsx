@@ -94,7 +94,12 @@ export default function EditCategoryModal({ category, onClose }) {
           <label className="text-xs font-medium text-[#9a9abf] mb-1 block">
             Upload Image
           </label>
-          <ImageUpload value={form.image} onChange={(file) => setFile(file)} />
+          <ImageUpload
+            value={form.image}
+            onChange={(file) => setFile(file)}
+            enableCrop
+            cropAspect={4 / 3}
+          />
         </div>
 
         <div className="flex justify-end gap-3 pt-2">

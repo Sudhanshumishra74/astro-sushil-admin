@@ -4,7 +4,6 @@ import { useParams } from "react-router-dom";
 import { useProductStore } from "../../store/useProductStore";
 import AddProduct from "./Addproduct";
 
-
 export default function EditProduct() {
   const { id } = useParams();
   const { product, fetchProductById, resetProduct, loading } = useProductStore();

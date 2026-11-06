@@ -9,6 +9,29 @@ export const useCustomerStore = create((set, get) => ({
   limit: 10,
   search: "",
 
+  customer: null,
+  customerLoading: false,
+
+  // Separate from the /auth list endpoint above — the admin customer detail
+  // page needs one customer by id, and /auth/:id (getUserById) is gated by
+  // the customer's own token, not an admin's.
+  fetchCustomerById: async (id) => {
+    try {
+      set({ customerLoading: true });
+
+      const res = await api.get(`/auth/admin/${id}`);
+
+      set({ customer: res.data.data });
+    } catch (err) {
+      console.error("Fetch customer error:", err);
+      set({ customer: null });
+    } finally {
+      set({ customerLoading: false });
+    }
+  },
+
+  clearCustomer: () => set({ customer: null }),
+
   fetchCustomers: async (params = {}) => {
     try {
       set({ loading: true });
@@ -51,6 +74,7 @@ export const useCustomerStore = create((set, get) => ({
       const updated = res.data.data;
       set((state) => ({
         customers: state.customers.map((c) => (c._id === id ? updated : c)),
+        customer: state.customer?._id === id ? updated : state.customer,
       }));
       return { ok: true };
     } catch (err) {

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import { useAuthStore } from "../../store/useAuthStore";
 import { useNavigate } from "react-router-dom";
+import { getFirstAccessibleRoute } from "../../utils/getFirstAccessibleRoute";
 
 export default function SignInPage() {
   const navigate = useNavigate();
@@ -23,7 +24,11 @@ export default function SignInPage() {
     const success = await login(form);
 
     if (success) {
-      navigate("/");
+      // Read the freshly-set user straight from the store rather than via a
+      // hook — this handler already has the post-login state by the time
+      // `login()` resolves, but a hook's own permission snapshot wouldn't
+      // reflect it until the next render.
+      navigate(getFirstAccessibleRoute(useAuthStore.getState().user));
     }
   };
 

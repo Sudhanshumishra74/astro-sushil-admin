@@ -21,11 +21,16 @@ export const useCategoryStore = create((set, get) => ({
 
       const { page, limit, search } = get();
 
-      const res = await api.get("/categories", {
+      // /categories/admin (not the public /categories) — the admin table
+      // needs each row's resolved effectiveMargin, which is internal
+      // business config the public listing (also used by customer
+      // browsing) deliberately never returns.
+      const res = await api.get("/categories/admin", {
         params: {
           page: params.page || page,
           limit: params.limit || limit,
           search: params.search ?? search,
+          includeInactive: true,
         },
       });
 

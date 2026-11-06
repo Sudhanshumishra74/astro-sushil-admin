@@ -2,8 +2,8 @@
 
 /* eslint-disable no-unused-vars */
 import { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
-import { motion } from "framer-motion";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft,
   Package,
@@ -17,9 +17,15 @@ import {
   ShoppingBag,
   FileText,
   ChevronDown,
+  LayoutGrid,
+  Undo2,
 } from "lucide-react";
 import { Badge, formatDate } from "../../components/common/Admintable";
+import PriceBreakdown from "../../components/common/PriceBreakdown";
 import { usePaymentStore } from "../../store/usePaymentStore";
+import { usePermission } from "../../hooks/usePermission";
+import OrderShipmentsTab from "./OrderShipmentsTab";
+import OrderReturnsTab from "./OrderReturnsTab";
 
 const ORDER_STATUSES = [
   { key: "placed", label: "Order Placed", icon: ShoppingBag },
@@ -48,6 +54,8 @@ const PAYMENT_VARIANT = {
   paid: "success",
   pending: "warning",
   failed: "danger",
+  partially_refunded: "warning",
+  refunded: "info",
 };
 
 const ALL_STATUS_OPTIONS = [
@@ -58,6 +66,32 @@ const ALL_STATUS_OPTIONS = [
   "delivered",
   "cancelled",
 ];
+
+// Mirrors OrderList.jsx's orderTypeLabel — order.orderType alone can't tell
+// you this order is a mix (it's "physical" whenever ANY item is physical,
+// even one placed alongside a digital item).
+function orderTypeLabel(order) {
+  const items = order.items || [];
+
+  if (order.orderType === "digital") return { label: "Digital", variant: "info" };
+  if (items.some((i) => i.type === "digital")) return { label: "Mixed", variant: "warning" };
+
+  return { label: "Physical", variant: "default" };
+}
+
+// Resolved to human-readable name+value pairs at order-creation time
+// (order.controller.js), not just variantId/subVariantId, specifically so
+// admin can see exactly what was ordered.
+function variantItemTags(item) {
+  return [
+    item.variantName ? `${item.variantName}: ${item.variantValue}` : null,
+    item.subVariantName ? `${item.subVariantName}: ${item.subVariantValue}` : null,
+    item.selectedRatti ? `${item.selectedRatti} ratti` : null,
+    item.certificateName
+      ? `${item.certificateName}${item.certificateIncludedInPrice ? "" : ` (+₹${item.certificatePrice})`}`
+      : null,
+  ].filter(Boolean);
+}
 
 function InfoCard({ title, icon: Icon, children }) {
   return (
@@ -135,6 +169,7 @@ function TrackingStep({ step, isActive, isCompleted, isLast }) {
 export default function OrderDetail() {
   const { orderId } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   const {
     order,
@@ -147,6 +182,40 @@ export default function OrderDetail() {
 
   const [selectedStatus, setSelectedStatus] = useState("");
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState(searchParams.get("tab") || "overview");
+  const { hasPermission } = usePermission();
+
+  // A fully-digital order (order.orderType is only ever "physical" or
+  // "digital" — see orderTypeLabel below) never ships and can't be returned,
+  // so neither tab applies regardless of permissions.
+  const isDigitalOnly = order?.orderType === "digital";
+
+  // Shown as soon as there's a self-fulfilled shipment, or when there are no
+  // shipments yet at all (order not processed yet), so the tab doesn't
+  // flicker in and out as fulfillment kicks off.
+  const hasSelfShipment =
+    !order?.shipments?.length || order.shipments.some((s) => s.fulfillmentType === "self");
+
+  const TABS = [
+    { key: "overview", label: "Overview", icon: LayoutGrid },
+    ...(!isDigitalOnly && hasPermission("shipments.view") && hasSelfShipment
+      ? [{ key: "shipments", label: "Shipments", icon: Truck }]
+      : []),
+    ...(!isDigitalOnly && hasPermission("returns.view") ? [{ key: "returns", label: "Returns", icon: Undo2 }] : []),
+  ];
+
+  // Guards against a stale/bookmarked `?tab=shipments` link rendering a tab
+  // that isn't currently in TABS.
+  const currentTab = TABS.some((t) => t.key === activeTab) ? activeTab : "overview";
+
+  // Once a shipment exists, processing/shipped/delivered are also derived
+  // automatically from its progress (orderSync.js's deriveOrderStatus,
+  // driven by Shiprocket) — but the admin can still manually override any
+  // status here too. deriveOrderStatus only ever advances forward (never
+  // downgrades — see ORDER_STATUS_RANK there), so a manual pick that's
+  // behind the shipment's actual progress will get bumped back up on the
+  // next shipment sync; a manual pick at or ahead of it sticks.
+  const hasShipments = order?.shipments?.length > 0;
 
   useEffect(() => {
     fetchOrderDetails(orderId);
@@ -159,7 +228,13 @@ export default function OrderDetail() {
 
   const handleStatusUpdate = async () => {
     if (!selectedStatus || selectedStatus === order?.orderStatus) return;
-    await updateOrderStatus(orderId, selectedStatus);
+    const ok = await updateOrderStatus(orderId, selectedStatus);
+    // Belt-and-suspenders: updateOrderStatus already merges the response
+    // into the store, but an explicit refetch guarantees this page reflects
+    // the true saved state (e.g. shipment-cancellation side effects
+    // triggered when cancelling) rather than relying on the response shape
+    // staying in sync forever.
+    if (ok) fetchOrderDetails(orderId);
   };
 
   if (detailsLoading) {
@@ -184,6 +259,7 @@ export default function OrderDetail() {
 
   const currentStepIdx = steps.findIndex((s) => s.key === order.orderStatus);
   const isCancelled = order.orderStatus === "cancelled";
+  const typeInfo = orderTypeLabel(order);
 
   return (
     <motion.div
@@ -218,18 +294,47 @@ export default function OrderDetail() {
             label={order.orderStatus}
             variant={STATUS_VARIANT[order.orderStatus] ?? "default"}
           />
-          <Badge
-            label={order.orderType === "digital" ? "Digital" : "Physical"}
-            variant={order.orderType === "digital" ? "info" : "default"}
-          />
+          <Badge label={typeInfo.label} variant={typeInfo.variant} />
         </div>
       </div>
 
+      {TABS.length > 1 && (
+        <div className="flex items-center gap-1 bg-[#faf8ff] border border-[#e0d9f5] rounded-xl p-1 w-fit">
+          {TABS.map((tab) => {
+            const Icon = tab.icon;
+            const isActive = currentTab === tab.key;
+            return (
+              <motion.button
+                key={tab.key}
+                whileTap={{ scale: 0.97 }}
+                onClick={() => setActiveTab(tab.key)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+                  isActive ? "bg-primary text-white shadow-sm shadow-primary/20" : "text-black hover:bg-white"
+                }`}
+              >
+                <Icon size={14} /> {tab.label}
+              </motion.button>
+            );
+          })}
+        </div>
+      )}
+
+      {currentTab === "shipments" && <OrderShipmentsTab orderId={orderId} order={order} />}
+      {currentTab === "returns" && <OrderReturnsTab orderId={orderId} order={order} />}
+
+      {currentTab === "overview" && (
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         <div className="lg:col-span-2 flex flex-col gap-5">
           <InfoCard title="Order Items" icon={Package}>
             <div className="flex flex-col gap-3">
-              {order.items?.map((item, i) => (
+              {(() => {
+                // Item price/mrp are stored in the order's own payment
+                // currency (see order.controller.js — converted at order
+                // creation), same as totalAmount below — hardcoding ₹ here
+                // while the total switches symbol showed a mismatched
+                // currency on every non-INR order.
+                const currencySymbol = order.payment?.currency?.toUpperCase() === "USD" ? "$" : "₹";
+                return order.items?.map((item, i) => (
                 <div
                   key={i}
                   className="flex items-center gap-3 p-3 rounded-xl border border-[#f5f2fc] bg-[#faf8ff]"
@@ -248,29 +353,61 @@ export default function OrderDetail() {
                     <p className="text-xs text-[#9a9abf] mt-0.5">
                       Qty: {item.quantity} · MRP{" "}
                       <span className="line-through">
-                        ₹{item.mrp?.toLocaleString("en-IN")}
+                        {currencySymbol}{item.mrp?.toLocaleString("en-IN")}
                       </span>
+                      {item.taxRate > 0 && <> · GST {item.taxRate}%</>}
                     </p>
+                    {variantItemTags(item).length > 0 && (
+                      <div className="flex items-center gap-1.5 flex-wrap mt-1.5">
+                        {variantItemTags(item).map((tag) => (
+                          <span
+                            key={tag}
+                            className="text-[10px] font-medium text-[#6c63ff] bg-[#6c63ff]/10 border border-[#6c63ff]/20 px-2 py-0.5 rounded-full"
+                          >
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
                   <div className="text-right shrink-0">
                     <p className="text-sm font-semibold text-black">
-                      ₹{(item.price * item.quantity).toLocaleString("en-IN")}
+                      {currencySymbol}{(item.price * item.quantity).toLocaleString("en-IN")}
                     </p>
                     <p className="text-xs text-green-600 font-medium">
-                      ₹{(item.mrp - item.price).toLocaleString("en-IN")} off
+                      {currencySymbol}{(item.mrp - item.price).toLocaleString("en-IN")} off
                     </p>
                   </div>
                 </div>
-              ))}
+                ));
+              })()}
 
-              <div className="flex items-center justify-between pt-3 border-t border-[#ede8f8]">
-                <span className="text-sm font-semibold text-black">
-                  Total Amount
-                </span>
-                <span className="text-base font-bold text-primary">
-                  {order.payment?.currency?.toUpperCase() === "USD" ? "$" : "₹"}
-                  {order.totalAmount?.toLocaleString("en-IN")}
-                </span>
+              <div className="pt-2 border-t border-[#ede8f8]">
+                {/* Admin-chosen live preference (Setting.shipping.displayMode) —
+                    "separate" renders self-fulfilled shipping as its own row
+                    here (matching PriceBreakdown's row styling) instead of
+                    letting it render one combined "Shipping" row —
+                    PriceBreakdown itself is shared with Transaction/Report
+                    views and isn't touched. */}
+                {order.shippingDisplayMode === "separate" &&
+                  order.selfShippingAmount > 0 && (
+                    <div className="flex items-start justify-between gap-4 py-2 border-b border-[#f5f2fc]">
+                      <span className="text-xs text-[#9a9abf] shrink-0">Shipping · Self-fulfilled</span>
+                      <span className="text-xs font-medium text-right text-black">
+                        {order.payment?.currency?.toUpperCase() === "USD" ? "$" : "₹"}
+                        {order.selfShippingAmount.toLocaleString("en-IN")}
+                      </span>
+                    </div>
+                  )}
+                <PriceBreakdown
+                  subTotal={order.subTotal}
+                  discount={order.discount}
+                  couponCode={order.coupon?.code}
+                  shipping={order.shippingDisplayMode === "separate" ? 0 : order.shipping}
+                  tax={order.tax}
+                  totalAmount={order.totalAmount}
+                  currency={order.payment?.currency}
+                />
               </div>
             </div>
           </InfoCard>
@@ -357,6 +494,14 @@ export default function OrderDetail() {
               </p>
             ) : (
               <div className="flex flex-col gap-3">
+                {hasShipments && (
+                  <p className="text-xs text-[#9a9abf]">
+                    Processing/Shipped/Delivered normally follow shipment tracking automatically,
+                    but you can still manually override the status below if needed. A manual
+                    status behind the shipment's actual progress may get bumped back up by the
+                    next shipment update.
+                  </p>
+                )}
                 <div className="relative">
                   <button
                     onClick={() => setDropdownOpen((p) => !p)}
@@ -459,6 +604,7 @@ export default function OrderDetail() {
           )}
         </div>
       </div>
+      )}
     </motion.div>
   );
 }

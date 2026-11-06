@@ -11,20 +11,37 @@ export const useProductStore = create((set, get) => ({
   page: 1,
   limit: 10,
   search: "",
+  source: "",
+  type: "",
 
   fetchProducts: async (params = {}) => {
     try {
       set({ loading: true });
 
-      const { page, limit, search } = {
+      const { page, limit, search, source, type } = {
         page: get().page,
         limit: get().limit,
         search: get().search,
+        source: get().source,
+        type: get().type,
         ...params,
       };
 
-      const res = await api.get("/products", {
-        params: { page, limit, search },
+      // /products/admin (not the public /products) — the public listing
+      // only ever returns published products, which meant a freshly
+      // created draft was invisible even to the admin who created it.
+      // source/type are already-supported buildProductQuery filters
+      // (product.controller.js) — physical/digital/service for type;
+      // omitted from the request entirely when empty so "All" doesn't send
+      // a query param the backend would have to special-case.
+      const res = await api.get("/products/admin", {
+        params: {
+          page,
+          limit,
+          search,
+          ...(source ? { source } : {}),
+          ...(type ? { type } : {}),
+        },
       });
 
       set({
@@ -33,6 +50,8 @@ export const useProductStore = create((set, get) => ({
         page,
         limit,
         search,
+        source,
+        type,
       });
     } catch (err) {
       showError(err);
@@ -228,6 +247,36 @@ export const useProductStore = create((set, get) => ({
     set({ loading: false });
   }
 },
+
+  // Separate endpoint from updateProduct above — publish/unpublish is local
+  // admin visibility, not part of the general product-edit fields, so it
+  // goes through this dedicated route instead. Deliberately doesn't set the
+  // global `loading` flag (unlike the other actions here) — that flag
+  // drives the whole table's skeleton-row state, which would be a jarring
+  // full-table flash for what's a single-row toggle; the row's own pending
+  // state is tracked locally in the component instead.
+  toggleProductStatus: async (id, isPublished) => {
+    try {
+      const res = await api.patch(`/products/${id}/status`, { isPublished });
+
+      // Merge in just the field that actually changed rather than replacing
+      // the whole cached row with the response — fetchProducts' /admin
+      // listing populates fields (category, etc.) that a narrow single-field
+      // update endpoint has no reason to fully replicate, and swapping in
+      // its response wholesale reverts those to their raw, unpopulated form.
+      set((state) => ({
+        products: state.products.map((p) =>
+          p._id === id ? { ...p, isPublished: res.data.data.isPublished } : p,
+        ),
+      }));
+
+      showSuccess(res);
+      return true;
+    } catch (err) {
+      showError(err);
+      return false;
+    }
+  },
 
   deleteProduct: async (id) => {
     try {

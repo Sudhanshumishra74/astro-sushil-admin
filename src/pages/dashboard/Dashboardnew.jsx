@@ -68,7 +68,14 @@ export default function Dashboard() {
       up: (dashboard?.reportOrders?.growth || 0) >= 0,
       permission: "reportOrders.view",
     },
-  ].filter((s) => hasPermission(s.permission));
+    // Every card here reads from `dashboard` state, which fetchDashboard()
+    // only populates when the user has "dashboard.view" — without also
+    // requiring it here, a role with e.g. "reportOrders.view" but not
+    // "dashboard.view" would still see this card (its own permission check
+    // passes), just permanently stuck at 0/empty since the fetch that would
+    // fill it in was skipped. Gating on both is what actually falls through
+    // to the "Select a section..." empty state below instead.
+  ].filter((s) => hasPermission("dashboard.view") && hasPermission(s.permission));
 
   const ALL_TIME = [
     {
@@ -103,10 +110,13 @@ export default function Dashboard() {
       value: dashboard?.reportOrders?.total || 0,
       permission: "reportOrders.view",
     },
-  ].filter((s) => hasPermission(s.permission));
+  ].filter((s) => hasPermission("dashboard.view") && hasPermission(s.permission));
 
-  const showChart = hasPermission("transactions.view");
-  const showTopProducts = hasPermission("products.view");
+  // showChart/showTopProducts also read from the same dashboard.view-gated
+  // fetch — showRecentOrders deliberately doesn't need it, since RecentOrders
+  // fetches its own data independently (usePaymentStore), not from `dashboard`.
+  const showChart = hasPermission("dashboard.view") && hasPermission("transactions.view");
+  const showTopProducts = hasPermission("dashboard.view") && hasPermission("products.view");
   const showRecentOrders = hasPermission("orders.view");
   const hasAnyWidget =
     THIS_MONTH.length > 0 || ALL_TIME.length > 0 || showChart || showTopProducts || showRecentOrders;

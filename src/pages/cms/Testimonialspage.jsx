@@ -7,6 +7,7 @@ import Toppage from "../../components/common/Toppage";
 import { Badge } from "../../components/common/Admintable";
 import { Modal } from "../../components/common/Modal";
 import { useSettingStore } from "../../store/useSettingStore";
+import ImageCropModal from "../../components/common/ImageCropModal";
 
 const EMPTY_FORM = {
   name: "",
@@ -55,6 +56,18 @@ function TestimonialFormModal({ title, initial, onSave, onClose }) {
     typeof initial?.image === "string" ? initial.image : null
   );
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+
+  const [cropSrc, setCropSrc] = useState(null);
+  const [pendingFile, setPendingFile] = useState(null);
+
+  // Routed through the same crop step as the admin's other image uploads
+  // (see Imageupload.jsx) — 1:1 since the storefront renders this as a
+  // circular avatar (Testimonialssection.jsx, rounded-full + object-cover).
+  const startCrop = (file) => {
+    if (!file) return;
+    setPendingFile(file);
+    setCropSrc(URL.createObjectURL(file));
+  };
 
   const handleImage = (file) => {
     if (!file) return;
@@ -178,9 +191,26 @@ function TestimonialFormModal({ title, initial, onSave, onClose }) {
               type="file"
               accept="image/*"
               className="hidden"
-              onChange={(e) => handleImage(e.target.files[0])}
+              onChange={(e) => startCrop(e.target.files[0])}
             />
           </label>
+
+          {/* Sibling of the label above, not nested inside it — a native
+              <label>/<input> pair re-triggers the file picker on any click
+              within the label, which would include clicks on this modal's
+              own buttons/slider if it were nested. */}
+          <ImageCropModal
+            open={!!cropSrc}
+            imageSrc={cropSrc}
+            aspect={1}
+            fileName={pendingFile?.name || "photo.jpg"}
+            mimeType={pendingFile?.type || "image/jpeg"}
+            onCancel={() => setCropSrc(null)}
+            onCropComplete={(croppedFile) => {
+              setCropSrc(null);
+              handleImage(croppedFile);
+            }}
+          />
         </div>
 
         {/* Footer: Active toggle + Buttons */}

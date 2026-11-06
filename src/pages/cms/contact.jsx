@@ -15,7 +15,6 @@ import { motion, AnimatePresence } from "framer-motion";
 
 import { useSettingStore } from "../../store/useSettingStore";
 import { Modal } from "../../components/common/Modal";
-import Can from "../../components/common/Can";
 
 export default function ContactsPage() {
   const {
@@ -26,7 +25,6 @@ export default function ContactsPage() {
     contactLoading,
     fetchContacts,
     deleteContact,
-    updateContactRemarks,
   } = useSettingStore();
 
   const [search, setSearch] = useState("");
@@ -34,8 +32,6 @@ export default function ContactsPage() {
   const [activeContact, setActiveContact] = useState(null);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
-  const [remarksDraft, setRemarksDraft] = useState("");
-  const [savingRemarks, setSavingRemarks] = useState(false);
 
   useEffect(() => {
     fetchContacts({ page: 1, limit: 10, search });
@@ -65,7 +61,6 @@ export default function ContactsPage() {
 
   const openView = (contact) => {
     setActiveContact(contact);
-    setRemarksDraft(contact.remarks || "");
     setModal("view");
   };
 
@@ -77,13 +72,6 @@ export default function ContactsPage() {
   const handleDelete = async () => {
     await deleteContact(activeContact._id);
     setModal(null);
-  };
-
-  const handleSaveRemarks = async () => {
-    setSavingRemarks(true);
-    const updated = await updateContactRemarks(activeContact._id, remarksDraft);
-    setSavingRemarks(false);
-    if (updated) setActiveContact(updated);
   };
 
   return (
@@ -144,7 +132,6 @@ export default function ContactsPage() {
                       { label: "Phone", sortable: false },
                       { label: "Subject", sortable: false },
                       { label: "Message", sortable: false },
-                      { label: "Remarks", sortable: false },
                       { label: "Date", sortable: true },
                       { label: "Actions", sortable: false },
                     ].map(({ label, sortable }) => (
@@ -170,7 +157,7 @@ export default function ContactsPage() {
                         key={i}
                         className="border-b border-[#f5f2fc] animate-pulse"
                       >
-                        {[...Array(8)].map((_, j) => (
+                        {[...Array(7)].map((_, j) => (
                           <td key={j} className="px-4 py-4">
                             <div className="h-4 bg-gray-100 rounded-lg w-3/4" />
                           </td>
@@ -179,7 +166,7 @@ export default function ContactsPage() {
                     ))
                   ) : contacts.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="px-4 py-16 text-center">
+                      <td colSpan={7} className="px-4 py-16 text-center">
                         <div className="flex flex-col items-center gap-2 text-gray-400">
                           <MessageSquare
                             size={32}
@@ -233,13 +220,6 @@ export default function ContactsPage() {
                           <td className="px-4 py-3.5 text-sm text-[#9a9abf] max-w-50">
                             <p className="line-clamp-1">
                               {row.message || "—"}
-                            </p>
-                          </td>
-
-                          {/* Remarks */}
-                          <td className="px-4 py-3.5 text-sm text-[#9a9abf] max-w-50">
-                            <p className="line-clamp-1">
-                              {row.remarks || "—"}
                             </p>
                           </td>
 
@@ -345,39 +325,6 @@ export default function ContactsPage() {
                     : "—"}
                 </p>
               </div>
-
-              <div>
-                <p className="text-xs text-[#9a9abf] mb-1">Admin Remarks</p>
-                <Can
-                  permission="contacts.edit"
-                  fallback={
-                    <p className="text-sm text-black bg-[#faf8ff] border border-[#ede8f8] rounded-xl p-3 leading-relaxed">
-                      {activeContact.remarks || "—"}
-                    </p>
-                  }
-                >
-                  <textarea
-                    rows={3}
-                    value={remarksDraft}
-                    onChange={(e) => setRemarksDraft(e.target.value)}
-                    placeholder="Add a remark for internal reference..."
-                    className="w-full text-sm text-black bg-[#faf8ff] border border-[#ede8f8] rounded-xl p-3 leading-relaxed outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all resize-none"
-                  />
-                  <div className="flex justify-end mt-2">
-                    <button
-                      onClick={handleSaveRemarks}
-                      disabled={
-                        savingRemarks ||
-                        remarksDraft === (activeContact.remarks || "")
-                      }
-                      className="px-4 py-1.5 rounded-xl text-xs font-medium bg-primary text-white hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {savingRemarks ? "Saving…" : "Save Remarks"}
-                    </button>
-                  </div>
-                </Can>
-              </div>
-
               <div className="flex justify-end pt-2">
                 <button
                   onClick={() => setModal(null)}

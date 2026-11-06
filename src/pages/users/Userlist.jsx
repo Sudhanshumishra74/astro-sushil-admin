@@ -1,13 +1,13 @@
 /* eslint-disable no-unused-vars */
 /* eslint-disable react-hooks/exhaustive-deps */
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useCustomerStore } from "../../store/useCustomerStore";
 import { motion, AnimatePresence } from "framer-motion";
 import DateFilter from "../../components/common/DateFilter";
 import toast from "react-hot-toast";
 import AdminPhoneInput from "../../components/common/AdminPhoneInput";
 import {
-  MoreHorizontal,
   ArrowUpDown,
   Search,
   ChevronLeft,
@@ -17,54 +17,11 @@ import {
   X,
   Save,
   Download,
+  Eye,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 import { downloadCsv } from "../../utils/exportCsv";
-
-function RowMenu({ onEdit, onDelete }) {
-  const [open, setOpen] = useState(false);
-
-  useEffect(() => {
-    if (!open) return;
-    const handler = () => setOpen(false);
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [open]);
-
-  return (
-    <div className="relative" onMouseDown={(e) => e.stopPropagation()}>
-      <button
-        onClick={() => setOpen((p) => !p)}
-        className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:bg-secondary hover:text-primary transition-colors cursor-pointer"
-      >
-        <MoreHorizontal size={16} />
-      </button>
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            className="absolute right-0 top-9 z-30 bg-white border border-[#ede8f8] rounded-xl shadow-lg overflow-hidden w-32"
-            initial={{ opacity: 0, scale: 0.95, y: -4 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: -4 }}
-            transition={{ duration: 0.15 }}
-          >
-            <button
-              onClick={() => { onEdit?.(); setOpen(false); }}
-              className="w-full text-left px-4 py-2.5 text-sm text-primary hover:bg-secondary transition-colors"
-            >
-              Edit
-            </button>
-            <button
-              onClick={() => { onDelete?.(); setOpen(false); }}
-              className="w-full text-left px-4 py-2.5 text-sm text-red-500 hover:bg-red-50 transition-colors"
-            >
-              Delete
-            </button>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  );
-}
 
 const FIELD = ({ label, children }) => (
   <div className="flex flex-col gap-1">
@@ -184,6 +141,59 @@ function EditCustomerModal({ customer, onClose, onSave, saving }) {
   );
 }
 
+function DeleteCustomerModal({ customer, onClose, onConfirm, loading }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <motion.div
+        className="absolute inset-0 bg-black/40"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        onClick={onClose}
+      />
+      <motion.div
+        className="relative bg-white rounded-2xl shadow-xl w-full max-w-md"
+        initial={{ opacity: 0, scale: 0.95, y: 16 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95, y: 16 }}
+        transition={{ duration: 0.22, ease: [0.4, 0, 0.2, 1] }}
+      >
+        <div className="flex items-center justify-between px-6 py-4 border-b border-[#ede8f8]">
+          <h2 className="font-bold text-base text-black">Delete Customer</h2>
+          <button
+            onClick={onClose}
+            className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-secondary transition-colors text-gray-400 hover:text-primary"
+          >
+            <X size={16} />
+          </button>
+        </div>
+        <div className="px-6 py-5 space-y-5">
+          <p className="text-sm text-[#9a9abf]">
+            Are you sure you want to delete{" "}
+            <span className="font-semibold text-black capitalize">{customer?.firstName}</span>{" "}
+            ({customer?.email})? This action cannot be undone.
+          </p>
+          <div className="flex items-center justify-end gap-3 pt-1">
+            <button
+              onClick={onClose}
+              className="px-5 py-2 cursor-pointer rounded-xl text-sm text-gray-500 border border-[#d8d0ee] hover:bg-secondary transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={onConfirm}
+              disabled={loading}
+              className="px-5 py-2 cursor-pointer rounded-xl text-sm font-medium bg-red-500 text-white hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loading ? "Deleting…" : "Delete"}
+            </button>
+          </div>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
 // ── Status Badge ──────────────────────────────────────────────────────────────
 function StatusBadge({ status }) {
   const isActive = status === "ACTIVE";
@@ -261,6 +271,7 @@ const HEADERS = [
 ];
 
 export default function CustomerList() {
+  const navigate = useNavigate();
   const {
     customers,
     fetchCustomers,
@@ -279,6 +290,8 @@ export default function CustomerList() {
   const [dateTo, setDateTo] = useState("");
   const [editCustomer, setEditCustomer] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     fetchCustomers();
@@ -306,6 +319,13 @@ export default function CustomerList() {
     } else {
       toast.error(result.message);
     }
+  };
+
+  const handleConfirmDelete = async () => {
+    setDeleting(true);
+    await deleteCustomer(deleteTarget._id);
+    setDeleting(false);
+    setDeleteTarget(null);
   };
 
 
@@ -394,9 +414,6 @@ export default function CustomerList() {
           <table className="w-full text-left">
             <thead>
               <tr className="border-b border-[#ede8f8] bg-[#faf8ff]">
-                <th className="w-10 px-4 py-3">
-                  <input type="checkbox" className="w-4 h-4 accent-primary cursor-pointer rounded" />
-                </th>
                 {HEADERS.map(({ label, sortable }) => (
                   <th key={label} className="px-4 py-3 text-left text-xs font-medium text-[#9a9abf] whitespace-nowrap">
                     <span className="flex items-center gap-1">
@@ -405,7 +422,9 @@ export default function CustomerList() {
                     </span>
                   </th>
                 ))}
-                <th className="w-12 px-4 py-3" />
+                <th className="px-4 py-3 text-left text-xs font-medium text-[#9a9abf] whitespace-nowrap">
+                  Actions
+                </th>
               </tr>
             </thead>
 
@@ -414,7 +433,7 @@ export default function CustomerList() {
                 [...Array(5)].map((_, i) => <SkeletonRow key={i} />)
               ) : customers.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-16 text-center">
+                  <td colSpan={7} className="px-4 py-16 text-center">
                     <div className="flex flex-col items-center gap-2 text-gray-400">
                       <User size={32} className="text-[#c0b8d8]" />
                       <p className="text-sm">No customers found.</p>
@@ -432,24 +451,22 @@ export default function CustomerList() {
                       transition={{ duration: 0.15, delay: idx * 0.03 }}
                       className="border-b border-[#f5f2fc] last:border-0 hover:bg-[#faf8ff] transition-colors group"
                     >
-                    
-                      <td className="px-4 py-3.5">
-                        <input type="checkbox" className="w-4 h-4 accent-primary cursor-pointer rounded" />
-                      </td>
-
                       {/* Customer name + email */}
                       <td className="px-4 py-3.5">
-                        <div className="flex items-center gap-3">
+                        <button
+                          onClick={() => navigate(`/customers/${customer._id}`)}
+                          className="flex items-center gap-3 text-left cursor-pointer"
+                        >
                           <Avatar name={customer.firstName} />
                           <div className="min-w-0">
-                            <p className="text-sm font-semibold text-black capitalize leading-tight">
+                            <p className="text-sm font-semibold text-black capitalize leading-tight hover:text-primary transition-colors">
                               {customer.firstName}
                             </p>
                             <p className="text-xs text-[#9a9abf] truncate max-w-45">
                               {customer.email}
                             </p>
                           </div>
-                        </div>
+                        </button>
                       </td>
 
                     
@@ -483,10 +500,29 @@ export default function CustomerList() {
 
                      
                       <td className="px-4 py-3.5">
-                        <RowMenu
-                          onEdit={() => setEditCustomer(customer)}
-                          onDelete={() => deleteCustomer(customer._id)}
-                        />
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => navigate(`/customers/${customer._id}`)}
+                            title="View"
+                            className="w-8 h-8 flex items-center justify-center cursor-pointer rounded-lg text-[#9a9abf] hover:bg-secondary hover:text-primary transition-colors"
+                          >
+                            <Eye size={15} />
+                          </button>
+                          <button
+                            onClick={() => setEditCustomer(customer)}
+                            title="Edit"
+                            className="w-8 h-8 flex items-center justify-center cursor-pointer rounded-lg text-[#9a9abf] hover:bg-secondary hover:text-primary transition-colors"
+                          >
+                            <Pencil size={15} />
+                          </button>
+                          <button
+                            onClick={() => setDeleteTarget(customer)}
+                            title="Delete"
+                            className="w-8 h-8 flex items-center justify-center cursor-pointer rounded-lg text-[#9a9abf] hover:bg-red-50 hover:text-red-500 transition-colors"
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        </div>
                       </td>
                     </motion.tr>
                   ))}
@@ -552,6 +588,17 @@ export default function CustomerList() {
             onClose={() => setEditCustomer(null)}
             onSave={handleSaveEdit}
             saving={saving}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {deleteTarget && (
+          <DeleteCustomerModal
+            customer={deleteTarget}
+            onClose={() => setDeleteTarget(null)}
+            onConfirm={handleConfirmDelete}
+            loading={deleting}
           />
         )}
       </AnimatePresence>

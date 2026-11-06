@@ -8,6 +8,7 @@ import {
 
 import RichTextEditor from "../../components/common/Richtexteditor2";
 import { useBlogStore } from "../../store/Useblogstore";
+import ImageCropModal from "../../components/common/ImageCropModal";
 
 const STATUSES = ["draft", "published"];
 
@@ -89,42 +90,83 @@ function ThumbnailZone({ file, onChange }) {
     : typeof file === "string"
     ? file
     : file?.url || null;
+  const [cropSrc, setCropSrc] = useState(null);
+  const [pendingFile, setPendingFile] = useState(null);
+
+  // Same crop step used across the admin's other image uploads (see
+  // Imageupload.jsx) — 16:9 as a wide/short compromise matching both the
+  // blog list card and the detail-page header (BlogCard.jsx/BlogDetail.jsx).
+  const startCrop = (f) => {
+    if (!f || !f.type.startsWith("image/")) return;
+    setPendingFile(f);
+    setCropSrc(URL.createObjectURL(f));
+  };
+
   const onDrop = useCallback((e) => {
     e.preventDefault();
-    const f = e.dataTransfer.files[0];
-    if (f && f.type.startsWith("image/")) onChange(f);
-  }, [onChange]);
+    startCrop(e.dataTransfer.files[0]);
+  }, []);
 
   return (
-    <div
-      onDrop={onDrop}
-      onDragOver={(e) => e.preventDefault()}
-      onClick={() => inputRef.current.click()}
-      className="group relative cursor-pointer rounded-2xl border-2 border-dashed border-[#d8d8f0] bg-[#fafafd] transition hover:border-[#6c63ff] hover:bg-[#f5f4ff] overflow-hidden"
-      style={{ aspectRatio: "16/6" }}
-    >
-      {preview ? (
-        <>
-          <img src={preview} alt="thumbnail" className="h-full w-full object-cover" />
-          <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition">
-            <p className="text-xs font-semibold text-white">Change thumbnail</p>
+    <>
+      <div
+        onDrop={onDrop}
+        onDragOver={(e) => e.preventDefault()}
+        onClick={() => inputRef.current.click()}
+        // Capped so this box doesn't stretch to the full width of its
+        // (wide) parent card and balloon in height — see the matching note
+        // on Addproduct.jsx's ThumbnailZone.
+        className="group relative cursor-pointer mx-auto w-full max-w-md rounded-2xl border-2 border-dashed border-[#d8d8f0] bg-[#fafafd] transition hover:border-[#6c63ff] hover:bg-[#f5f4ff] overflow-hidden"
+        style={{ aspectRatio: "16/9" }}
+      >
+        {preview ? (
+          <>
+            <img src={preview} alt="thumbnail" className="h-full w-full object-cover" />
+            <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition">
+              <p className="text-xs font-semibold text-white">Change thumbnail</p>
+            </div>
+          </>
+        ) : (
+          <div className="flex h-full flex-col items-center justify-center gap-2 text-[#9a9abf]">
+            <div className="rounded-2xl bg-[#6c63ff]/10 p-3"><Upload size={22} className="text-[#6c63ff]" /></div>
+            <p className="text-xs font-medium">Drop image or click to upload</p>
+            <p className="text-[11px]">PNG, JPG, WEBP — 16:9 recommended</p>
           </div>
-        </>
-      ) : (
-        <div className="flex h-full flex-col items-center justify-center gap-2 text-[#9a9abf]">
-          <div className="rounded-2xl bg-[#6c63ff]/10 p-3"><Upload size={22} className="text-[#6c63ff]" /></div>
-          <p className="text-xs font-medium">Drop image or click to upload</p>
-          <p className="text-[11px]">PNG, JPG, WEBP — 16:9 recommended</p>
-        </div>
-      )}
-      <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={(e) => onChange(e.target.files[0])} />
-    </div>
+        )}
+        <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={(e) => startCrop(e.target.files[0])} />
+      </div>
+
+      {/* Sibling, not a child of the clickable zone above — nesting it
+          inside would let clicks on the modal's own buttons/slider bubble
+          up and reopen the file picker. */}
+      <ImageCropModal
+        open={!!cropSrc}
+        imageSrc={cropSrc}
+        aspect={16 / 9}
+        fileName={pendingFile?.name || "thumbnail.jpg"}
+        mimeType={pendingFile?.type || "image/jpeg"}
+        onCancel={() => setCropSrc(null)}
+        onCropComplete={(croppedFile) => {
+          setCropSrc(null);
+          onChange(croppedFile);
+        }}
+      />
+    </>
   );
 }
 
 function AvatarZone({ file, onChange }) {
   const inputRef = useRef();
   const preview = typeof file === "string" ? file : file ? URL.createObjectURL(file) : null;
+  const [cropSrc, setCropSrc] = useState(null);
+  const [pendingFile, setPendingFile] = useState(null);
+
+  const startCrop = (f) => {
+    if (!f || !f.type.startsWith("image/")) return;
+    setPendingFile(f);
+    setCropSrc(URL.createObjectURL(f));
+  };
+
   return (
     <div className="flex items-center gap-4">
       <div
@@ -143,9 +185,24 @@ function AvatarZone({ file, onChange }) {
             <User size={20} className="text-[#c0b8d8]" />
           </div>
         )}
-        <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={(e) => onChange(e.target.files[0])} />
+        <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={(e) => startCrop(e.target.files[0])} />
       </div>
       <p className="text-xs text-[#9a9abf]">Click to upload author avatar<br />PNG, JPG, WEBP</p>
+
+      {/* Sibling of the clickable zone above, not nested inside it — see
+          the matching comment on ThumbnailZone. */}
+      <ImageCropModal
+        open={!!cropSrc}
+        imageSrc={cropSrc}
+        aspect={1}
+        fileName={pendingFile?.name || "avatar.jpg"}
+        mimeType={pendingFile?.type || "image/jpeg"}
+        onCancel={() => setCropSrc(null)}
+        onCropComplete={(croppedFile) => {
+          setCropSrc(null);
+          onChange(croppedFile);
+        }}
+      />
     </div>
   );
 }

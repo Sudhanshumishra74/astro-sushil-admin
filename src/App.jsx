@@ -10,6 +10,7 @@ import PublicRoute from "./routes/PublicRoute";
 import ProtectedRoute from "./routes/ProtectedRoute";
 import RequirePermission from "./routes/RequirePermission";
 import Userlist from "./pages/users/Userlist";
+import CustomerDetail from "./pages/users/CustomerDetail";
 
 import CourseList from "./pages/Course/Courselist";
 import AddCourse from "./pages/Course/Addcourse";
@@ -52,6 +53,9 @@ import ReportForm from "./pages/Reports/ReportForm";
 import RoleList from "./pages/Roles/Rolelist";
 import StaffList from "./pages/Staff/Stafflist";
 import AccessDenied from "./pages/errors/AccessDenied";
+import ReturnsList from "./pages/Returns/ReturnsList";
+import ShipmentsList from "./pages/Shipments/ShipmentsList";
+import ActivityLogPage from "./pages/ActivityLog/ActivityLogPage";
 
 function App() {
   return (
@@ -66,9 +70,13 @@ function App() {
             {/* Always reachable once logged in */}
             <Route path="403" element={<AccessDenied />} />
             <Route path="profile" element={<ProfilePage />} />
-            {/* Dashboard is never hard-guarded — it renders only the widgets
-                the user has permission for, rather than 403ing on login. */}
-            <Route index element={<Dashboard />} />
+            {/* Gated like every other module page — a role without
+                "dashboard.view" never lands here at all, since Login.jsx
+                sends them to their own first accessible page instead
+                (getFirstAccessibleRoute). */}
+            <Route element={<RequirePermission permission="dashboard.view" />}>
+              <Route index element={<Dashboard />} />
+            </Route>
 
             <Route element={<RequirePermission permission="products.view" />}>
               <Route path="products" element={<ProductsPage />} />
@@ -100,6 +108,13 @@ function App() {
               <Route path="orders" element={<OrderList />} />
               <Route path="orders/:orderId" element={<OrderDetail />} />
             </Route>
+
+            <Route element={<RequirePermission permission="shipments.view" />}>
+              <Route path="shipments" element={<ShipmentsList />} />
+            </Route>
+            <Route element={<RequirePermission permission="returns.view" />}>
+              <Route path="returns" element={<ReturnsList />} />
+            </Route>
             <Route element={<RequirePermission permission="orders.export" />}>
               <Route path="reports" element={<OrderReports />} />
             </Route>
@@ -118,6 +133,7 @@ function App() {
 
             <Route element={<RequirePermission permission="customers.view" />}>
               <Route path="customers" element={<Userlist />} />
+              <Route path="customers/:id" element={<CustomerDetail />} />
             </Route>
 
             <Route element={<RequirePermission permission="courses.view" />}>
@@ -203,6 +219,9 @@ function App() {
             </Route>
             <Route element={<RequirePermission permission="staff.view" />}>
               <Route path="staff" element={<StaffList />} />
+            </Route>
+            <Route element={<RequirePermission permission="activityLog.view" />}>
+              <Route path="activity-log" element={<ActivityLogPage />} />
             </Route>
           </Route>
         </Route>

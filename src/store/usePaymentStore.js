@@ -21,9 +21,12 @@ export const usePaymentStore = create((set) => ({
     limit = 10,
     search = "",
     status = "",
+    source = "",
+    orderType = "",
     fromDate = "",
     toDate = "",
     productId = "",
+    userId = "",
   } = {}) => {
     try {
       set({ loading: true });
@@ -34,9 +37,12 @@ export const usePaymentStore = create((set) => ({
           limit,
           search,
           status,
+          ...(source && { source }),
+          ...(orderType && { orderType }),
           ...(fromDate && { fromDate }),
           ...(toDate && { toDate }),
           ...(productId && { productId }),
+          ...(userId && { userId }),
         },
       });
 

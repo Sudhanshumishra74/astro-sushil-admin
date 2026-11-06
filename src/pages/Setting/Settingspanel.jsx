@@ -4,69 +4,39 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Store,
   Phone,
-  Share2,
-  Briefcase,
   CreditCard,
   Truck,
-  Package,
-  Tag,
   ShoppingCart,
-  Bell,
-  Mail,
-  MessageSquare,
-  Key,
-  Settings,
-  FileText,
   ChevronRight,
   Menu,
   X,
   Megaphone,
-  Sparkles,
+  Package,
 } from "lucide-react";
 
 import Toppage from "../../components/common/Toppage";
 
 import { useSettingStore } from "../../store/useSettingStore";
 import { slideIn } from "./Settingsui";
-import BrandingSection from "./Brandingsection";
 import ContactSection from "./Contactsection";
-import SocialSection from "./Socialsection";
-import {
-  BusinessSection,
-  OffersSection,
-  PaymentSection,
-  ProductSection,
-  ShippingSection,
-} from "./Miscsections";
-import {
-  CommunicationSection,
-  OtpSection,
-  SmsSection,
-  SmtpSection,
-  SystemSection,
-} from "./Techsections";
+import ShiprocketSection from "./Shiprocketsection";
 import TopBarSection from "./Topbarsection";
-import HighlightsBarSection from "./Highlightsbarsection";
+import {
+  OrderSection,
+  PaymentSection,
+  ShippingSection,
+  ProductSection,
+} from "./Miscsections";
 
-// ─── Nav config ────────────────────────────────────────────────────────────────
 const NAV = [
   { id: "topbar", label: "Top Bar", icon: Megaphone },
-  { id: "highlightsbar", label: "Highlights Bar", icon: Sparkles },
-  { id: "branding", label: "Branding", icon: Store },
   { id: "contact", label: "Contact", icon: Phone },
-  { id: "social", label: "Social Links", icon: Share2 },
-  { id: "business", label: "Business", icon: Briefcase },
   { id: "payment", label: "Payment", icon: CreditCard },
   { id: "shipping", label: "Shipping", icon: Truck },
   { id: "product", label: "Products", icon: Package },
-  // { id: "offers",        label: "Offers",         icon: Tag },
-  // { id: "communication", label: "Notifications",  icon: Bell },
-  // { id: "smtp",          label: "SMTP Email",     icon: Mail },
-  // { id: "sms",           label: "SMS",            icon: MessageSquare },
-  // { id: "otp",           label: "OTP",            icon: Key },
-  { id: "system", label: "System", icon: Settings },
+  { id: "order", label: "Orders", icon: ShoppingCart },
+  { id: "shiprocket", label: "Shiprocket", icon: Truck },
 ];
 
 function NavItem({ item, isActive, onClick }) {
@@ -91,30 +61,18 @@ function renderSection(id) {
   switch (id) {
     case "topbar":
       return <TopBarSection />;
-    case "highlightsbar":
-      return <HighlightsBarSection />;
-    case "branding":
-      return <BrandingSection />;
     case "contact":
       return <ContactSection />;
-    case "social":
-      return <SocialSection />;
-    case "business":
-      return <BusinessSection />;
     case "payment":
       return <PaymentSection />;
     case "shipping":
       return <ShippingSection />;
     case "product":
       return <ProductSection />;
-    // case "offers":        return <OffersSection />;
-    // case "order":         return <OrderSection />;
-    // case "communication": return <CommunicationSection />;
-    // case "smtp":          return <SmtpSection />;
-    // case "sms":           return <SmsSection />;
-    // case "otp":           return <OtpSection />;
-    case "system":
-      return <SystemSection />;
+    case "order":
+      return <OrderSection />;
+    case "shiprocket":
+      return <ShiprocketSection />;
 
     default:
       return null;
@@ -167,6 +125,12 @@ export default function SettingsPanel2() {
           {/* Top bar with current section + hamburger */}
           <div className="flex items-center justify-between bg-white border border-[#e0d9f5] rounded-2xl px-4 py-3 mb-4">
             <div className="flex items-center gap-2">
+              {activeNav && (
+                <activeNav.icon size={16} className="text-primary" />
+              )}
+              <span className="text-sm font-bold text-black">
+                {activeNav?.label}
+              </span>
               {activeNav && (
                 <activeNav.icon size={16} className="text-primary" />
               )}
